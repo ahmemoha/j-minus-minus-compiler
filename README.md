@@ -1,5 +1,3 @@
-# cpsc_411w26
-
 # CPSC 411: Milestone 1: J-- Scanner
 
 ## Author
