@@ -49,7 +49,10 @@ OR : '||';
 // J-- supports base 10 integers only. Leading zeros are treated as decimal.
 INT_LIT : [0-9]+
 
+// supports escapes: \b, \f, \t, \r, \n, \', \", \\
+STRING_LIT : '"' ( ESC | ~["\\\r\n] )* '"';
 
+fragment ESC : '\\' [bftrn'"\\];
 
 // ws and comments
 // Whitespace skipping
