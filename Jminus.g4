@@ -18,7 +18,30 @@ TRUE : 'true';
 VOID : 'void';
 WHILE : 'while';
 
-// operators
+// operators/punctuation
+ASSIGN : '=';
+COMMA : ',';
+DIV : '/';
+DOT : '.';
+EQ : '==';
+GT : '>';
+LT : '<';
+MINUS : '-';
+MULT : '*';
+NOT : '!';
+NE : '!=';
+PLUS : '+';
+LE : '<=';
+LBRACE : '{';
+LBRACK : '[';
+LPAREN : '(';
+RBRACE : '}';
+RBRACK : ']';
+RPAREN : ')';
+SEMI : ';';
+AND : '&&';
+OR : '||';
+
 
 // literals and identifiers
 
