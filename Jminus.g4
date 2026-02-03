@@ -54,3 +54,15 @@ INT_LIT : [0-9]+
 // ws and comments
 // Whitespace skipping
 WS : [ \t\r\n]+ -> skip ;
+
+// Skip single-line comments (// to end of line)
+LINE_COMMENT : '//' ~[\r\n]* -> skip;
+
+// Skip block comments
+BLOCK_COMMENT : '/*' .*? '*/' -> skip;
+
+
+
+
+// Catch any character that didn't match previous rules
+ERR : . ;
