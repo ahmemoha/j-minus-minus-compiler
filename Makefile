@@ -1,8 +1,8 @@
 ANTLR = ~aycock/411/bin/cpsc411-antlr4
+GRAMMER = Jminus.g4
 
 all:
-	$(ANTLR) -Dlanguage=Python3 -visitor -no-listener Jmm.g4
-
+        $(ANTLR_JAR) -Dlanguage=Python3 -no-listener -visitor $(GRAMMAR)
 clean:
-	rm -f JmmLexer.py Jmm.tokens Jmm.interp *.pyc
+	rm -f JminusLexer.py Jminus.tokens Jminus.interp *.pyc
 	rm -rf __pycache__
