@@ -54,14 +54,18 @@ STRING_LIT : '"' ( ESC | ~["\\\r\n] )* '"';
 
 fragment ESC : '\\' [bftrn'"\\];
 
-// ws and comments
-// Whitespace skipping
+
+// letter/underscore followed by alphanumeric or underscore
+ID : [a-zA-Z_] [a-zA-Z0-9_]*;
+
+// ws
+// whitespace skipping
 WS : [ \t\r\n]+ -> skip ;
 
-// Skip single-line comments (// to end of line)
+// skip single line comments (// to end of line)
 LINE_COMMENT : '//' ~[\r\n]* -> skip;
 
-// Skip block comments
+// skip block comments
 BLOCK_COMMENT : '/*' .*? '*/' -> skip;
 
 
