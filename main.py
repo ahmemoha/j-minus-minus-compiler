@@ -1,8 +1,15 @@
 import sys
 import os
-import os
 from antlr4 import *
+from antlr4.error.ErrorListener import ErrorListener
 from Jminus import Jminus
+
+
+# made a error listener to handle crashes or errors properly
+class FatalErrorListener(ErrorListener):
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        sys.stderr.write(f"Lexical Error at line {line}:{column} - {msg}\n")
+        sys.exit(1)
 
 def main():
     # check for the arguments
@@ -17,8 +24,31 @@ def main():
         sys.stderr.write(f"Error: File '{input_path}' not found.\n")
         sys.exit(1)
 
-    # have for initializing the ANTLR Lexer here
-    print(f"Processing {input_path}...") 
+    # have for initializing the ANTLR lexer here
+    print(f"Processing {input_path}...")
+
+    # set t up the stream
+    input_stream = FileStream(input_path, encoding='utf-8')
+
+    # have out lexer initialized
+    lexer = Jminus(input_stream)
+
+    # add error listener
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(FatalErrorListener())
+
+    # now have it process tokens
+    token = lexer.nextToken()
+    while token.type != Token.EOF:
+        # get the symbolic name from the grammar or fallback to ID
+        rule_name = lexer.symbolicNames[token.type]
+        if not rule_name:
+            rule_name = str(token.type)
+
+        # print to stdout
+        print(f"Line {token.line}: {rule_name}('{token.text}')")
+
+        token = lexer.nextToken()
 
     # success
     sys.exit(0)
