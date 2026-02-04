@@ -1,5 +1,5 @@
-ANTLR = ~aycock/411/bin/cpsc411-antlr4
-GRAMMER = Jminus.g4
+ANTLR_JAR = ~aycock/411/bin/cpsc411-antlr4
+GRAMMAR = Jminus.g4
 
 all:
         $(ANTLR_JAR) -Dlanguage=Python3 -no-listener -visitor $(GRAMMAR)
