@@ -34,6 +34,9 @@ def main():
     lexer.removeErrorListeners()
     lexer.addErrorListener(FatalErrorListener())
 
+    # warning counter
+    warning_count = 0
+
     # now have it process tokens
     token = lexer.nextToken()
     while token.type != Token.EOF:
@@ -41,10 +44,15 @@ def main():
         if not rule_name:
             rule_name = str(token.type)
 
-        # Handle ERR token specifically
+        # handle ERR token specifically
         if rule_name == 'ERR':
-            # Print warning to stderr like reference compiler
+            # print warning to stderr like reference compiler
             sys.stderr.write(f"warning: unknown char at or near line {token.line}\n")
+            warning_count += 1
+            # exit after 10 warnings to prevent flooding
+            if warning_count >= 10:
+                sys.stderr.write(f"error: too many warnings at or near line {token.line}\n")
+                sys.exit(1)
         else:
              print(f"{rule_name} @ line {token.line}, attr '{token.text}'")
 
