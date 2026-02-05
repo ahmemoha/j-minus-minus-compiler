@@ -16,7 +16,7 @@ WHILE : 'while';
 // operators/punctuation
 ASSIGN : '=';
 COMMA : ',';
-DIV : '/';
+DIVIDE : '/';
 DOT : '.';
 EQ : '==';
 GT : '>';
@@ -45,7 +45,7 @@ OR : '||';
 INT_LIT : [0-9]+;
 
 // supports escapes: \b, \f, \t, \r, \n, \', \", \\
-STRING_LIT : '"' ( ESC | ~["\\\r\n] )* '"';
+STRING : '"' ( ESC | ~["\\\r\n] )* '"';
 
 fragment ESC : '\\' [bftrn'"\\];
 
