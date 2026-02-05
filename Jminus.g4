@@ -55,7 +55,7 @@ ID : [a-zA-Z_] [a-zA-Z0-9_]*;
 
 // ws
 // whitespace skipping
-WS : [ \t\r\n]+ -> skip ;
+WS : [ \t\r\n\f]+ -> skip ;
 
 // skip single line comments (// to end of line)
 LINE_COMMENT : '//' ~[\r\n]* -> skip;
