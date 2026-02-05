@@ -9,7 +9,7 @@ from Jminus import Jminus
 class FatalErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         sys.stderr.write(f"warning: unknown char at or near line {line}\n") # Matches the reference output format exactly
-        sys.exit(1)
+        # Don't exit, the scanner should continue trying
 
 def main():
     # check for the arguments
@@ -37,13 +37,17 @@ def main():
     # now have it process tokens
     token = lexer.nextToken()
     while token.type != Token.EOF:
-        # get the symbolic name from the grammar or fallback to ID
         rule_name = lexer.symbolicNames[token.type]
         if not rule_name:
             rule_name = str(token.type)
 
-        # print to stdout
-        print(f"{rule_name} @ line {token.line}, attr '{token.text}'")
+        # Handle ERR token specifically
+        if rule_name == 'ERR':
+            # Print warning to stderr like reference compiler
+            sys.stderr.write(f"warning: unknown char at or near line {token.line}\n")
+        else:
+             print(f"{rule_name} @ line {token.line}, attr '{token.text}'")
+
         token = lexer.nextToken()
 
 if __name__ == '__main__':
