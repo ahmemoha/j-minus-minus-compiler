@@ -49,8 +49,8 @@ def main():
             # print warning to stderr like reference compiler
             sys.stderr.write(f"warning: unknown char at or near line {token.line}\n")
             warning_count += 1
-            # exit after 10 warnings to prevent flooding
-            if warning_count >= 10:
+            # exit after 11 warnings to prevent flooding
+            if warning_count >= 11:
                 sys.stderr.write(f"error: too many warnings at or near line {token.line}\n")
                 sys.exit(1)
         else:
