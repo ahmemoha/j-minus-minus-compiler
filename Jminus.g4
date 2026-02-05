@@ -18,7 +18,6 @@ BREAK   : 'break';
 ASSIGN : '=';
 COMMA : ',';
 DIVIDE : '/';
-DOT : '.';
 EQ : '==';
 GT : '>';
 LT : '<';
