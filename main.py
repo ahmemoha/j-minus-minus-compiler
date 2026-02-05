@@ -8,7 +8,7 @@ from Jminus import Jminus
 # made a error listener to handle crashes or errors properly
 class FatalErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        sys.stderr.write(f"Lexical Error at line {line}:{column} - {msg}\n")
+        sys.stderr.write(f"warning: unknown char at or near line {line}\n") # Matches the reference output format exactly
         sys.exit(1)
 
 def main():
@@ -23,9 +23,6 @@ def main():
     if not os.path.isfile(input_path):
         sys.stderr.write(f"Error: File '{input_path}' not found.\n")
         sys.exit(1)
-
-    # have for initializing the ANTLR lexer here
-    print(f"Processing {input_path}...")
 
     # set t up the stream
     input_stream = FileStream(input_path, encoding='utf-8')
@@ -46,12 +43,8 @@ def main():
             rule_name = str(token.type)
 
         # print to stdout
-        print(f"Line {token.line}: {rule_name}('{token.text}')")
-
+        print(f"{rule_name} @ line {token.line}, attr '{token.text}'")
         token = lexer.nextToken()
-
-    # success
-    sys.exit(0)
 
 if __name__ == '__main__':
     main()
