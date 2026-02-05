@@ -51,6 +51,11 @@ STRING : '"' ( ESC | ~["\\\r\n] )* '"';
 
 fragment ESC : '\\' [bftrn'"\\];
 
+// string contains newline that'll catch "abc\n
+NL : '"' ( ESC | ~["\\\r\n] )* [\r\n];
+
+// unclosed string at EOF, so catcing "abc
+UNCLOSED_STRING : '"' ( ESC | ~["\\\r\n] )*;
 
 // letter/underscore followed by alphanumeric or underscore
 ID : [a-zA-Z_] [a-zA-Z0-9_]*;
