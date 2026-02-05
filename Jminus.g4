@@ -12,6 +12,7 @@ RETURN : 'return';
 TRUE : 'true';
 VOID : 'void';
 WHILE : 'while';
+BREAK   : 'break';
 
 // operators/punctuation
 ASSIGN : '=';
@@ -23,6 +24,7 @@ GT : '>';
 LT : '<';
 MINUS : '-';
 MULT : '*';
+MODULO : '%';
 NOT : '!';
 NE : '!=';
 PLUS : '+';
