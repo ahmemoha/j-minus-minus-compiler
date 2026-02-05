@@ -67,11 +67,20 @@ def main():
             sys.stderr.write(f"error: EOF in string at or near line {token.line}\n")
             sys.exit(1)
 
-        # valid string
+        # valid tokens
         else:
-             print(f"{rule_name} @ line {token.line}, attr '{token.text}'")
+            # the reference compiler expects the output to have escaped backslashes
+            display_text = token.text.replace('\\', '\\\\')
+
+            # if it contains a null byte, then we should replace it
+            display_text = display_text.replace('\x00', '\\x00')
+
+            print(f"{rule_name} @ line {token.line}, attr '{display_text}'")
 
         token = lexer.nextToken()
+
+    # prints the <EOF>
+    print(f"<EOF> @ line {token.line}, attr '<EOF>'")
 
 if __name__ == '__main__':
     main()
