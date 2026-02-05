@@ -25,7 +25,7 @@ def main():
         sys.exit(1)
 
     # set t up the stream
-    input_stream = FileStream(input_path, encoding='utf-8')
+    input_stream = FileStream(input_path, encoding='utf-8', errors='replace')
 
     # have out lexer initialized
     lexer = Jminus(input_stream)
