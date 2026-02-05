@@ -51,6 +51,10 @@ STRING : '"' ( ESC | ~["\\\r\n] )* '"';
 
 fragment ESC : '\\' [bftrn'"\\];
 
+// bad escape sequence like ab\0de
+// it matches quote, valid parts, then backslash + invalid char, then rest of string, then quote
+BAD_ESCAPE : '"' ( ESC | ~["\\\r\n] )* '\\' ~[bftrn'"\\\r\n] ~["\r\n]* '"';
+
 // string contains newline that'll catch "abc\n
 NL : '"' ( ESC | ~["\\\r\n] )* [\r\n];
 
