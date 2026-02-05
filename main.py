@@ -53,6 +53,17 @@ def main():
             if warning_count >= 11:
                 sys.stderr.write(f"error: too many warnings at or near line {token.line}\n")
                 sys.exit(1)
+        elif rule_name == 'NL':
+            # matches reference error for NL in string...
+            sys.stderr.write(f"error: NL in string at or near line {token.line}\n")
+            sys.exit(1)
+
+        elif rule_name == 'UNCLOSED_STRING':
+            # Matches reference: error EOF in string...
+            sys.stderr.write(f"error: EOF in string at or near line {token.line}\n")
+            sys.exit(1)
+
+        # valid string
         else:
              print(f"{rule_name} @ line {token.line}, attr '{token.text}'")
 
@@ -60,3 +71,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
