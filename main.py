@@ -58,10 +58,12 @@ def main():
             sys.stderr.write(f"error: bad escape in string at or near line {token.line}\n")
             sys.exit(1)
         elif rule_name == 'NL':
-            # matches reference error for NL in string...
-            sys.stderr.write(f"error: NL in string at or near line {token.line}\n")
+            # matches reference error for NL in string..., but also see if the text contains /r
+            if '\r' in token.text:
+                sys.stderr.write(f"error: CR in string at or near line {token.line}\n")
+            else:
+                sys.stderr.write(f"error: NL in string at or near line {token.line}\n")
             sys.exit(1)
-
         elif rule_name == 'UNCLOSED_STRING':
             # matches reference error for EOF in string...
             sys.stderr.write(f"error: EOF in string at or near line {token.line}\n")
