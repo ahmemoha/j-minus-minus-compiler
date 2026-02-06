@@ -5,6 +5,6 @@ all:
 	$(ANTLR_JAR) -Dlanguage=Python3 -no-listener -visitor $(GRAMMAR)
 
 clean:
-	rm -f JminusLexer.py Jminus.tokens Jminus.py Jminus.interp
+	rm -f Jminus.tokens Jminus.py Jminus.interp
 	rm -rf __pycache__
 
