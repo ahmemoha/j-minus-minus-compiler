@@ -3,7 +3,8 @@ GRAMMAR = Jminus.g4
 
 all:
 	$(ANTLR_JAR) -Dlanguage=Python3 -no-listener -visitor $(GRAMMAR)
+
 clean:
-	rm -f JminusLexer.py Jminus.tokens Jminus.py Jminus.interp *.pyc
+	rm -f JminusLexer.py Jminus.tokens Jminus.py Jminus.interp
 	rm -rf __pycache__
 
