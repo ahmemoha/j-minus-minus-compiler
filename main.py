@@ -16,24 +16,23 @@ start / 1 : program($1)
 globaldeclarations / 1 : $1
 globaldeclarations / 2 : $1 +($2)
 
-globaldeclaration : $1
+globaldeclaration / 1 : $1
 
-type with INT : int
-type with BOOLEAN : bool
+type / 1 : $1
 
-variabledeclaration : globVarDecl($1, $2)
+variabledeclaration / 3 : globVarDecl($1, $2)
 
-identifier : id
+identifier / 1 : $1
 
+functiondeclaration / 5 with 'void' : funcDecl($1, $2, formals, $5)
+functiondeclaration / 6 with 'void' : funcDecl($1, $2, formals($4), $6)
 functiondeclaration / 5 with type : funcDecl($1, $2, formals, $5)
 functiondeclaration / 6 with type : funcDecl($1, $2, formals($4), $6)
-functiondeclaration / 5 with VOID : funcDecl(void, $2, formals, $5)
-functiondeclaration / 6 with VOID : funcDecl(void, $2, formals($4), $6)
 
 formalparameterlist / 1 : $1
 formalparameterlist / 3 : $1 +($3)
 
-formalparameter : formal($1, $2)
+formalparameter / 2 : formal($1, $2)
 
 mainfunctiondeclaration / 4 : mainDecl(void, $1, formals, $4)
 mainfunctiondeclaration / 5 : mainDecl(void, $1, formals($3), $5)
@@ -44,23 +43,22 @@ block / 3 : block($2)
 blockstatements / 1 : $1
 blockstatements / 2 : $1 +($2)
 
-blockstatement : $1
+blockstatement / 1 : $1
 
 statement / 1 with block : $1
-statement / 2 with ';' : emptyStmt
+statement / 1 with ';' : emptyStmt
 statement / 2 with statementexpression : $1
-statement / 2 with BREAK : breakStmt
-statement / 3 with RETURN : returnStmt($2)
-statement / 2 with RETURN : returnStmt
-statement / 5 with IF : ifStmt($3, $5)
-statement / 7 with IF : ifElseStmt($3, $5, $7)
-statement / 5 with WHILE : whileStmt($3, $5)
+statement / 2 with 'break' : breakStmt
+statement / 3 with 'return' : returnStmt($2)
+statement / 2 with 'return' : returnStmt
+statement / 5 with 'if' : ifStmt($3, $5)
+statement / 7 with 'if' : ifElseStmt($3, $5, $7)
+statement / 5 with 'while' : whileStmt($3, $5)
 
-statementexpression : $1
+statementexpression / 1 : $1
 
-primary / 1 with literal : $1
+primary / 1 : $1
 primary / 3 with '(' : $2
-primary / 1 with functioninvocation : $1
 
 postfixexpression / 1 : $1
 
@@ -99,10 +97,7 @@ assignment / 3 : assign($1, $3)
 
 expression / 1 : $1
 
-literal with NUMBER : num
-literal with STRING : str
-literal with TRUE : true
-literal with FALSE : false
+literal / 1 : $1
 
 argumentlist / 1 : $1
 argumentlist / 3 : $1 +($3)
@@ -110,6 +105,7 @@ argumentlist / 3 : $1 +($3)
 functioninvocation / 4 : call($1, $3)
 functioninvocation / 3 : call($1)
 """
+
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
