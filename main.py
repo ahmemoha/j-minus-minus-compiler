@@ -18,28 +18,28 @@ globaldeclarations / 2 : $1 +($2)
 
 globaldeclaration : $1
 
-type with BOOLEAN : bool
 type with INT : int
+type with BOOLEAN : bool
 
 variabledeclaration : globVarDecl($1, $2)
 
 identifier : id
 
-functiondeclaration / 6 with type : funcDecl($1, $2, formals($4), $6)
 functiondeclaration / 5 with type : funcDecl($1, $2, formals, $5)
-functiondeclaration / 6 with VOID : funcDecl(void, $2, formals($4), $6)
+functiondeclaration / 6 with type : funcDecl($1, $2, formals($4), $6)
 functiondeclaration / 5 with VOID : funcDecl(void, $2, formals, $5)
+functiondeclaration / 6 with VOID : funcDecl(void, $2, formals($4), $6)
 
 formalparameterlist / 1 : $1
 formalparameterlist / 3 : $1 +($3)
 
 formalparameter : formal($1, $2)
 
-mainfunctiondeclaration / 5 : mainDecl(void, $1, formals($3), $5)
 mainfunctiondeclaration / 4 : mainDecl(void, $1, formals, $4)
+mainfunctiondeclaration / 5 : mainDecl(void, $1, formals($3), $5)
 
-block / 3 : block($2)
 block / 2 : block
+block / 3 : block($2)
 
 blockstatements / 1 : $1
 blockstatements / 2 : $1 +($2)
@@ -52,7 +52,6 @@ statement / 2 with statementexpression : $1
 statement / 2 with BREAK : breakStmt
 statement / 3 with RETURN : returnStmt($2)
 statement / 2 with RETURN : returnStmt
-
 statement / 5 with IF : ifStmt($3, $5)
 statement / 7 with IF : ifElseStmt($3, $5, $7)
 statement / 5 with WHILE : whileStmt($3, $5)
@@ -117,7 +116,7 @@ functioninvocation / 3 : call($1)
 class FatalErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         # Milestone 2 spec: Error and warning messages should go to standard error. You should exit immediately after an error message.
-        sys.stderr.write(f"error: syntax error at or near line {line}\n") 
+        sys.stderr.write(f"error: {msg} at or near line {line}\n")
         sys.exit(1)
 
 def main():
