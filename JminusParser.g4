@@ -32,14 +32,7 @@ variabledeclaration     : type identifier ';'
 identifier              : ID
                         ;
 
-functiondeclaration     : functionheader block
-                        ;
-
-functionheader          : type functiondeclarator
-                        | VOID functiondeclarator
-                        ;
-
-functiondeclarator      : type identifier '(' formalparameterlist ')' block
+functiondeclaration     : type identifier '(' formalparameterlist ')' block
                         | type identifier '(' ')' block
                         | VOID identifier '(' formalparameterlist ')' block
                         | VOID identifier '(' ')' block
@@ -54,9 +47,6 @@ formalparameter         : type identifier
 
 mainfunctiondeclaration : identifier '(' formalparameterlist ')' block
                         | identifier '(' ')' block
-                        ;
-
-mainfunctiondeclarator  : identifier '(' ')'
                         ;
 
 block                   : '{' blockstatements '}'
