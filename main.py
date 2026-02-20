@@ -10,6 +10,22 @@ from cpsc411.astshaper import ASTShaper
 # AST shape specification for J--
 # we'll build this incrementally based on ASTShaper warnings
 SHAPE_SPEC = """
+// 1. Rename terminals directly (preserves attr and lineno)
+'int' : int
+'boolean' : bool
+'void' : void
+ID : id
+NUMBER : num
+STRING : str
+'true' : true
+'false' : false
+
+// 2. Pass those renamed terminals straight up through their wrappers
+type / 1 : $1
+identifier / 1 : $1
+literal / 1 : $1
+
+// 3. Main Tree Structure
 start / 0 : program
 start / 1 : program($1)
 
@@ -18,11 +34,7 @@ globaldeclarations / 2 : $1 +($2)
 
 globaldeclaration / 1 : $1
 
-type / 1 : $1
-
 variabledeclaration / 3 : globVarDecl($1, $2)
-
-identifier / 1 : $1
 
 functiondeclaration / 5 with 'void' : funcDecl($1, $2, formals, $5)
 functiondeclaration / 6 with 'void' : funcDecl($1, $2, formals($4), $6)
@@ -97,15 +109,12 @@ assignment / 3 : assign($1, $3)
 
 expression / 1 : $1
 
-literal / 1 : $1
-
 argumentlist / 1 : $1
 argumentlist / 3 : $1 +($3)
 
 functioninvocation / 4 : call($1, $3)
 functioninvocation / 3 : call($1)
 """
-
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
