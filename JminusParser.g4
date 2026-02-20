@@ -39,8 +39,10 @@ functionheader          : type functiondeclarator
                         | VOID functiondeclarator
                         ;
 
-functiondeclarator      : identifier '(' formalparameterlist ')'
-                        | identifier '(' ')'
+functiondeclarator      : type identifier '(' formalparameterlist ')' block
+                        | type identifier '(' ')' block
+                        | VOID identifier '(' formalparameterlist ')' block
+                        | VOID identifier '(' ')' block
                         ;
 
 formalparameterlist     : formalparameter
@@ -50,7 +52,8 @@ formalparameterlist     : formalparameter
 formalparameter         : type identifier
                         ;
 
-mainfunctiondeclaration : mainfunctiondeclarator block
+mainfunctiondeclaration : identifier '(' formalparameterlist ')' block
+                        | identifier '(' ')' block
                         ;
 
 mainfunctiondeclarator  : identifier '(' ')'
