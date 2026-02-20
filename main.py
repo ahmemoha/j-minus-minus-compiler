@@ -1,9 +1,11 @@
 import sys
+sys.path.insert(0, '/home/profs/aycock/411/lib/antlr4/python3.13') # ensure the cpsc411 library path is loaded
 import os
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
 from Jminus import Jminus
-
+from JminusParser import JminusParser
+import cpsc411.astshaper
 
 # AST shape specification for J--
 # we'll build this incrementally based on ASTShaper warnings
