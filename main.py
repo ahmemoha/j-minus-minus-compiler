@@ -5,6 +5,11 @@ from antlr4.error.ErrorListener import ErrorListener
 from Jminus import Jminus
 
 
+# AST shape specification for J--
+# we'll build this incrementally based on ASTShaper warnings
+SHAPE_SPEC = """
+"""
+
 # made a error listener to handle crashes or errors properly
 class FatalErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
