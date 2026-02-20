@@ -17,14 +17,14 @@ type            : BOOLEAN
                 | INT
                 ;
 
-// we inline the variable declaration like type identifier ';' 
-// so we can shape it differently for global vs local
-globaldeclarations      : type identifier ';'
-                        | functiondeclaration
-                        | mainfunctiondeclaration
+
+globaldeclarations      : globaldeclaration
+                        | globaldeclarations globaldeclaration
                         ;
 
-globaldeclaration       : variabledeclaration
+// we inline the variable declaration like type identifier ';' 
+// so we can shape it differently for global vs local
+globaldeclaration       : type identifier ';'
                         | functiondeclaration
                         | mainfunctiondeclaration
                         ;
@@ -138,3 +138,4 @@ assignment              : identifier '=' assignmentexpression
 
 expression              : assignmentexpression
                         ;
+
