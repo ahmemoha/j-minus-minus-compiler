@@ -10,56 +10,58 @@ from cpsc411.astshaper import ASTShaper
 # AST shape specification for J--
 # we'll build this incrementally based on ASTShaper warnings
 SHAPE_SPEC = """
-// 1. Rename terminals directly (preserves attr and lineno)
+// 1. Rename terminals directly
 'int' : int
 'boolean' : bool
 'void' : void
 ID : id
-NUMBER : num
-STRING : str
+INT_LIT : number
+STRING : string
 'true' : true
 'false' : false
 
-// 2. Pass those renamed terminals straight up through their wrappers
+// 2. Pass terminals straight up
 type / 1 : $1
 identifier / 1 : $1
 literal / 1 : $1
 
 // 3. Main Tree Structure
 start / 0 : program
-start / 1 : program($1)
+start / 1 : $1
 
-globaldeclarations / 1 : $1
+globaldeclarations / 1 : program($1)
 globaldeclarations / 2 : $1 +($2)
 
+// Global Variable Declaration
+globaldeclaration / 3 : globVarDecl($1, $2)
 globaldeclaration / 1 : $1
 
-variabledeclaration / 3 : globVarDecl($1, $2)
-
-functiondeclaration / 5 with 'void' : funcDecl($1, $2, formals, $5)
-functiondeclaration / 6 with 'void' : funcDecl($1, $2, formals($4), $6)
+functiondeclaration / 5 with 'void' : funcDecl(void, $2, formals, $5)
+functiondeclaration / 6 with 'void' : funcDecl(void, $2, $4, $6)
 functiondeclaration / 5 with type : funcDecl($1, $2, formals, $5)
-functiondeclaration / 6 with type : funcDecl($1, $2, formals($4), $6)
+functiondeclaration / 6 with type : funcDecl($1, $2, $4, $6)
 
-formalparameterlist / 1 : $1
+formalparameterlist / 1 : formals($1)
 formalparameterlist / 3 : $1 +($3)
 
 formalparameter / 2 : formal($1, $2)
 
 mainfunctiondeclaration / 4 : mainDecl(void, $1, formals, $4)
-mainfunctiondeclaration / 5 : mainDecl(void, $1, formals($3), $5)
+mainfunctiondeclaration / 5 : mainDecl(void, $1, $3, $5)
 
 block / 2 : block
-block / 3 : block($2)
+block / 3 : $2
 
-blockstatements / 1 : $1
+blockstatements / 1 : block($1)
 blockstatements / 2 : $1 +($2)
 
+// Local Variable Declaration
+blockstatement / 3 : varDecl($1, $2)
 blockstatement / 1 : $1
 
 statement / 1 with block : $1
-statement / 1 with ';' : emptyStmt
-statement / 2 with statementexpression : $1
+statement / 1 with ';' : nullStmt
+statement / 2 with statementexpression : exprStmt($1)
 statement / 2 with 'break' : breakStmt
 statement / 3 with 'return' : returnStmt($2)
 statement / 2 with 'return' : returnStmt
@@ -105,16 +107,17 @@ conditionalorexpression / 3 with OR : OR($1, $3)
 
 assignmentexpression / 1 : $1
 
-assignment / 3 : assign($1, $3)
+assignment / 3 : ASSIGN($1, $3)
 
 expression / 1 : $1
 
-argumentlist / 1 : $1
+argumentlist / 1 : actuals($1)
 argumentlist / 3 : $1 +($3)
 
-functioninvocation / 4 : call($1, $3)
-functioninvocation / 3 : call($1)
+functioninvocation / 4 : funcCall($1, $3)
+functioninvocation / 3 : funcCall($1)
 """
+
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
