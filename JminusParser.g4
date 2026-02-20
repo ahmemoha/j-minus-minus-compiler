@@ -7,7 +7,7 @@ start           : /* empty */
                 | globaldeclarations
                 ;
 
-literal         : NUMBER
+literal         : INT_LIT
                 | STRING
                 | TRUE
                 | FALSE
@@ -17,16 +17,16 @@ type            : BOOLEAN
                 | INT
                 ;
 
-globaldeclarations      : globaldeclaration
-                        | globaldeclarations globaldeclaration
+// we inline the variable declaration like type identifier ';' 
+// so we can shape it differently for global vs local
+globaldeclarations      : type identifier ';'
+                        | functiondeclaration
+                        | mainfunctiondeclaration
                         ;
 
 globaldeclaration       : variabledeclaration
                         | functiondeclaration
                         | mainfunctiondeclaration
-                        ;
-
-variabledeclaration     : type identifier ';'
                         ;
 
 identifier              : ID
@@ -57,7 +57,7 @@ blockstatements         : blockstatement
                         | blockstatements blockstatement
                         ;
 
-blockstatement          : variabledeclaration
+blockstatement          : type identifier ';'
                         | statement
                         ;
 
