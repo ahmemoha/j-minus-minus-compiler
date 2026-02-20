@@ -74,6 +74,9 @@ def main():
             # the reference compiler expects the output to have escaped backslashes
             display_text = token.text.replace('\\', '\\\\')
 
+            # escape single quotes to match the reference compiler's formatting
+            display_text = display_text.replace("'", "\\'")
+
             # if it contains a null byte, then we should replace it
             display_text = display_text.replace('\x00', '\\x00')
 
