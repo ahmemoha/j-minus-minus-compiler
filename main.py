@@ -6,6 +6,8 @@ from antlr4.error.ErrorListener import ErrorListener
 from Jminus import Jminus
 from JminusParser import JminusParser
 from cpsc411.astshaper import ASTShaper
+from cpsc411.ast import AST
+
 
 # AST shape specification for J--
 # we'll build this incrementally based on ASTShaper warnings
@@ -115,7 +117,7 @@ argumentlist / 1 : actuals($1)
 argumentlist / 3 : $1 +($3)
 
 functioninvocation / 4 : funcCall($1, $3)
-functioninvocation / 3 : funcCall($1)
+functioninvocation / 3 : funcCall($1, actuals)
 """
 
 # updated error listener for Milestone 2
@@ -125,6 +127,31 @@ class FatalErrorListener(ErrorListener):
         # Milestone 2 spec: Error and warning messages should go to standard error. You should exit immediately after an error message.
         sys.stderr.write(f"error: {msg} at or near line {line}\n")
         sys.exit(1)
+
+def fold_uminus(node):
+    # if it's not an AST node like a raw token, just return it
+    if not hasattr(node, 'type'):
+        return node
+
+    # if this is a UMINUS node, and its only child is a 'number', fold it
+    if node.type == 'UMINUS' and len(node) == 1 and getattr(node[0], 'type', '') == 'number':
+        # grab the line number from the UMINUS node
+        lineno = getattr(node, 'lineno', getattr(node[0], 'lineno', 0))
+        # create and return a brand new folded number node
+        return AST('number', attr='-' + node[0].attr, lineno=lineno)
+
+    # otherwise safely reconstruct the current node
+    # we grab its attributes like lineno, attr but ignore internal lists
+    attrs = {k: v for k, v in vars(node).items() if k not in ('type', 'children') and not isinstance(v, list)}
+    new_node = AST(node.type, **attrs)
+
+    # recursively fold all the children
+    for child in node:
+        new_node.append(fold_uminus(child))
+
+    return new_node
+
+
 
 def main():
     # check for the arguments
@@ -167,6 +194,9 @@ def main():
     # build the AST using ASTShaper
     shaper = ASTShaper(SHAPE_SPEC)
     ast = shaper.shapetree(tree)
+
+    # fold the constant negative number
+    ast = fold_uminus(ast)
 
     # print the textual representation of the AST
     print(ast)
