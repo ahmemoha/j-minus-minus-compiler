@@ -32,12 +32,12 @@ start / 1 : $1
 globaldeclarations / 1 : program($1)
 globaldeclarations / 2 : $1 +($2)
 
-// Global Variable Declaration
 globaldeclaration / 3 : globVarDecl($1, $2)
 globaldeclaration / 1 : $1
 
-functiondeclaration / 5 with 'void' : funcDecl(void, $2, formals, $5)
-functiondeclaration / 6 with 'void' : funcDecl(void, $2, $4, $6)
+// Use $1 here to preserve the attr='void' for regular functions
+functiondeclaration / 5 with 'void' : funcDecl($1, $2, formals, $5)
+functiondeclaration / 6 with 'void' : funcDecl($1, $2, $4, $6)
 functiondeclaration / 5 with type : funcDecl($1, $2, formals, $5)
 functiondeclaration / 6 with type : funcDecl($1, $2, $4, $6)
 
@@ -46,6 +46,7 @@ formalparameterlist / 3 : $1 +($3)
 
 formalparameter / 2 : formal($1, $2)
 
+// Use custom 'void' here to strip the attr for main
 mainfunctiondeclaration / 4 : mainDecl(void, $1, formals, $4)
 mainfunctiondeclaration / 5 : mainDecl(void, $1, $3, $5)
 
@@ -55,7 +56,6 @@ block / 3 : $2
 blockstatements / 1 : block($1)
 blockstatements / 2 : $1 +($2)
 
-// Local Variable Declaration
 blockstatement / 3 : varDecl($1, $2)
 blockstatement / 1 : $1
 
@@ -92,18 +92,18 @@ additiveexpression / 3 with '-' : SUB($1, $3)
 relationalexpression / 1 : $1
 relationalexpression / 3 with '<' : LT($1, $3)
 relationalexpression / 3 with '>' : GT($1, $3)
-relationalexpression / 3 with LE : LE($1, $3)
-relationalexpression / 3 with GE : GE($1, $3)
+relationalexpression / 3 with '<=' : LE($1, $3)
+relationalexpression / 3 with '>=' : GE($1, $3)
 
 equalityexpression / 1 : $1
-equalityexpression / 3 with EQ : EQ($1, $3)
-equalityexpression / 3 with NE : NE($1, $3)
+equalityexpression / 3 with '==' : EQ($1, $3)
+equalityexpression / 3 with '!=' : NE($1, $3)
 
 conditionalandexpression / 1 : $1
-conditionalandexpression / 3 with AND : AND($1, $3)
+conditionalandexpression / 3 with '&&' : AND($1, $3)
 
 conditionalorexpression / 1 : $1
-conditionalorexpression / 3 with OR : OR($1, $3)
+conditionalorexpression / 3 with '||' : OR($1, $3)
 
 assignmentexpression / 1 : $1
 
@@ -117,7 +117,6 @@ argumentlist / 3 : $1 +($3)
 functioninvocation / 4 : funcCall($1, $3)
 functioninvocation / 3 : funcCall($1)
 """
-
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
