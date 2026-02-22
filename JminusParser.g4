@@ -72,8 +72,7 @@ statement               : block
                         | WHILE '(' expression ')' statement
                         ;
 
-statementexpression     : assignment
-                        | functioninvocation
+statementexpression     : expression
                         ;
 
 primary                 : literal
