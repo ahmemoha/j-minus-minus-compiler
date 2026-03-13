@@ -7,118 +7,7 @@ from Jminus import Jminus
 from JminusParser import JminusParser
 from cpsc411.astshaper import ASTShaper
 from cpsc411.ast import AST
-
-
-# AST shape specification for J--
-# we'll build this incrementally based on ASTShaper warnings
-SHAPE_SPEC = """
-// 1. Rename terminals directly
-'int' : int
-'boolean' : bool
-'void' : void
-ID : id
-INT_LIT : number
-STRING : string
-'true' : true
-'false' : false
-
-// 2. Pass terminals straight up
-type / 1 : $1
-identifier / 1 : $1
-literal / 1 : $1
-
-// 3. Main Tree Structure
-start / 0 : program
-start / 1 : $1
-
-globaldeclarations / 1 : program($1)
-globaldeclarations / 2 : $1 +($2)
-
-globaldeclaration / 3 : globVarDecl($1, $2)
-globaldeclaration / 1 : $1
-
-// Use $1 here to preserve the attr='void' for regular functions
-functiondeclaration / 5 with 'void' : funcDecl($1, $2, formals, $5)
-functiondeclaration / 6 with 'void' : funcDecl($1, $2, $4, $6)
-functiondeclaration / 5 with type : funcDecl($1, $2, formals, $5)
-functiondeclaration / 6 with type : funcDecl($1, $2, $4, $6)
-
-formalparameterlist / 1 : formals($1)
-formalparameterlist / 3 : $1 +($3)
-
-formalparameter / 2 : formal($1, $2)
-
-// Use custom 'void' here to strip the attr for main
-mainfunctiondeclaration / 4 : mainDecl(void, $1, formals, $4)
-mainfunctiondeclaration / 5 : mainDecl(void, $1, $3, $5)
-
-block / 2 : block
-block / 3 : $2
-
-blockstatements / 1 : block($1)
-blockstatements / 2 : $1 +($2)
-
-blockstatement / 3 : varDecl($1, $2)
-blockstatement / 1 : $1
-
-statement / 1 with block : $1
-statement / 1 with ';' : nullStmt
-statement / 2 with statementexpression : exprStmt($1)
-statement / 2 with 'break' : breakStmt
-statement / 3 with 'return' : returnStmt($2)
-statement / 2 with 'return' : returnStmt
-statement / 5 with 'if' : ifStmt($3, $5)
-statement / 7 with 'if' : ifElseStmt($3, $5, $7)
-statement / 5 with 'while' : whileStmt($3, $5)
-
-statementexpression / 1 : $1
-
-primary / 1 : $1
-primary / 3 with '(' : $2
-
-postfixexpression / 1 : $1
-
-unaryexpression / 1 : $1
-unaryexpression / 2 with '-' : UMINUS($2)
-unaryexpression / 2 with '!' : NOT($2)
-
-multiplicativeexpression / 1 : $1
-multiplicativeexpression / 3 with '*' : MUL($1, $3)
-multiplicativeexpression / 3 with '/' : DIV($1, $3)
-multiplicativeexpression / 3 with '%' : MOD($1, $3)
-
-additiveexpression / 1 : $1
-additiveexpression / 3 with '+' : ADD($1, $3)
-additiveexpression / 3 with '-' : SUB($1, $3)
-
-relationalexpression / 1 : $1
-relationalexpression / 3 with '<' : LT($1, $3)
-relationalexpression / 3 with '>' : GT($1, $3)
-relationalexpression / 3 with '<=' : LE($1, $3)
-relationalexpression / 3 with '>=' : GE($1, $3)
-
-equalityexpression / 1 : $1
-equalityexpression / 3 with '==' : EQ($1, $3)
-equalityexpression / 3 with '!=' : NE($1, $3)
-
-conditionalandexpression / 1 : $1
-conditionalandexpression / 3 with '&&' : AND($1, $3)
-
-conditionalorexpression / 1 : $1
-conditionalorexpression / 3 with '||' : OR($1, $3)
-
-assignmentexpression / 1 : $1
-
-assignment / 3 : ASSIGN($1, $3)
-
-expression / 1 : $1
-
-argumentlist / 1 : actuals($1)
-argumentlist / 3 : $1 +($3)
-
-functioninvocation / 4 : funcCall($1, $3)
-functioninvocation / 3 : funcCall($1, actuals)
-"""
+from semantic import check_semantics
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
@@ -191,12 +80,23 @@ def main():
     # parse the input starting at the 'start' rule
     tree = parser.start()
 
+    # Read the shape spec from the new file
+    try:
+        with open('shapespec.txt', 'r') as f:
+            shape_spec = f.read()
+    except IOError:
+        sys.stderr.write("Error: Could not read shapespec.txt\n")
+        sys.exit(1)
+
     # build the AST using ASTShaper
-    shaper = ASTShaper(SHAPE_SPEC)
+    shaper = ASTShaper(shape_spec)
     ast = shaper.shapetree(tree)
 
     # fold the constant negative number
     ast = fold_uminus(ast)
+
+    # perform semantic checking, that would decorate the AST and catches errors
+    ast = check_semantics(ast)
 
     # print the textual representation of the AST
     print(ast)
