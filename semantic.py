@@ -106,6 +106,62 @@ class Pass2_LocalDecls(ASTTraversal):
         super().__init__(ast)
         self.symtab = symtab
 
+    def n_funcDecl(self, node):
+        # entering a function: Open a new local scope
+        self.symtab.open_scope()
+        formals_node = node[2]
+        for formal in formals_node:
+            var_type = formal[0].attr
+            name = formal[1].attr
+            lineno = formal[1].lineno
+            self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
+
+    def n_funcDecl_exit(self, node):
+        # exiting a function: Close the local scope
+        self.symtab.close_scope()
+
+    def n_mainDecl(self, node):
+        self.symtab.open_scope()
+        formals_node = node[2]
+        for formal in formals_node:
+            var_type = formal[0].attr
+            name = formal[1].attr
+            lineno = formal[1].lineno
+            self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
+
+    def n_mainDecl_exit(self, node):
+        self.symtab.close_scope()
+
+    def n_block(self, node):
+        self.block_depth += 1
+
+    def n_block_exit(self, node):
+        self.block_depth -= 1
+
+    def n_varDecl(self, node):
+        # children: [type, id]
+        lineno = node[1].lineno
+        if self.block_depth > 1:
+            semantic_error("local declaration not in outermost block", lineno)
+
+        var_type = node[0].attr
+        name = node[1].attr
+        self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
+
+    def n_id(self, node):
+        # lookup the identifier in the scope stack
+        name = node.attr
+        sym = self.symtab.lookup(name)
+        if not sym:
+            semantic_error(f"undeclared identifier '{name}'", node.lineno)
+        # link the AST node directly to its symbol table entry!
+        node.sym = sym
+
+    def n_funcCall(self, node):
+        # node[0] is the id node of the function being called
+        if node[0].attr == 'main':
+            semantic_error("main function can't be called", node[0].lineno)
+
 # type checking
 class Pass3_TypeCheck(ASTTraversal):
     def __init__(self, ast, symtab):
