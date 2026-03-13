@@ -53,6 +53,52 @@ class Pass1_GlobalDecls(ASTTraversal):
     def __init__(self, ast, symtab):
         super().__init__(ast)
         self.symtab = symtab
+        self.main_found = False
+
+    def n_globVarDecl(self, node):
+        # children: [type, id]
+        var_type = node[0].attr
+        name = node[1].attr
+        lineno = node[1].lineno
+        self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
+
+    def n_funcDecl(self, node):
+        # children: [type, id, formals, block]
+        rtype = node[0].attr
+        name = node[1].attr
+        lineno = node[1].lineno
+
+        # extract parameter types to build the signature
+        formals_node = node[2]
+        arg_types = []
+        for formal in formals_node:
+            arg_types.append(formal[0].attr)
+
+        sig = f"f({','.join(arg_types)})"
+
+        self.symtab.define(name, {'type': sig, 'rv': rtype, 'node': node}, lineno)
+
+    def n_mainDecl(self, node):
+        # children: [void, id, formals, block]
+        name = node[1].attr
+        lineno = node[1].lineno
+
+        if self.main_found:
+            semantic_error("multiple main declarations found", lineno)
+        self.main_found = True
+
+        formals_node = node[2]
+        if len(formals_node) > 0:
+            semantic_error("main declaration can't have parameters", lineno)
+
+        # define main in the symbol table
+        self.symtab.define(name, {'type': 'f()', 'rv': 'void', 'node': node}, lineno)
+
+    def n_program(self, node):
+        # because this is a post order traversal, n_program runs LAST,
+        # after all children have been evaluated.
+        if not self.main_found:
+            semantic_error("no main declaration found")
 
 # local scopes and identifier linking
 class Pass2_LocalDecls(ASTTraversal):
@@ -74,4 +120,7 @@ class Pass4_MiscChecks(ASTTraversal):
 
 def check_semantics(ast):
     symtab = SymbolTable()
+
+    Pass1_GlobalDecls(ast, symtab).postorder()
+
     return ast
