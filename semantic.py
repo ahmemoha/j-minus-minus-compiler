@@ -267,6 +267,30 @@ class Pass3_TypeCheck(ASTTraversal):
         # the whileStmt in the AST has condition at index 0
         self.check_condition(node[0])
 
+    # function calls
+    def n_funcCall(self, node):
+        id_node = node[0]
+        sym = getattr(id_node, 'sym', None)
+        if not sym:
+            node.expr_type = 'error'
+            return
+
+        expected_sig = sym['type'] # example like 'f(int,boolean)'
+
+        # build the actual signature from arguments
+        actuals_node = node[1] if len(node) > 1 else []
+        actual_types = []
+        for arg in actuals_node:
+            t = getattr(arg, 'expr_type', 'error')
+            actual_types.append(t)
+
+        actual_sig = f"f({','.join(actual_types)})"
+
+        if expected_sig != actual_sig:
+            semantic_error("number/type of arguments doesn't match function declaration", id_node.lineno)
+
+        node.expr_type = sym['rv']
+
 
 # miscellaneous checks
 class Pass4_MiscChecks(ASTTraversal):
