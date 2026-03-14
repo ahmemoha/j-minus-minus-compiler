@@ -60,6 +60,9 @@ class Pass1_GlobalDecls(ASTTraversal):
         var_type = node[0].attr
         name = node[1].attr
         lineno = node[1].lineno
+        # add sig to the type and id nodes
+        node[0].sig = var_type
+        node[1].sig = var_type
         self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
 
     def n_funcDecl(self, node):
@@ -74,7 +77,13 @@ class Pass1_GlobalDecls(ASTTraversal):
         for formal in formals_node:
             arg_types.append(formal[0].attr)
 
-        sig = f"f({','.join(arg_types)})"
+        # map boolean to bool for the signature to match reference compiler
+        sig_args = ['bool' if t == 'boolean' else t for t in arg_types]
+        sig = f"f({','.join(sig_args)})"
+
+        # add sig to the type and id nodes
+        node[0].sig = 'bool' if rtype == 'boolean' else rtype
+        node[1].sig = sig
 
         self.symtab.define(name, {'type': sig, 'rv': rtype, 'node': node}, lineno)
 
@@ -90,6 +99,10 @@ class Pass1_GlobalDecls(ASTTraversal):
         formals_node = node[2]
         if len(formals_node) > 0:
             semantic_error("main declaration can't have parameters", lineno)
+
+        # add sig to the void and id nodes
+        node[0].sig = 'void'
+        node[1].sig = 'f()'
 
         # define main in the symbol table
         self.symtab.define(name, {'type': 'f()', 'rv': 'void', 'node': node}, lineno)
