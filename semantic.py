@@ -169,6 +169,26 @@ class Pass3_TypeCheck(ASTTraversal):
         super().__init__(ast)
         self.symtab = symtab
 
+    # --- Leaf Nodes ---
+    def n_number(self, node):
+        node.expr_type = 'int'
+
+    def n_true(self, node):
+        node.expr_type = 'boolean'
+
+    def n_false(self, node):
+        node.expr_type = 'boolean'
+
+    def n_string(self, node):
+        node.expr_type = 'string'
+
+    def n_id(self, node):
+        # Inherit the type from the symbol table we attached in Pass 2
+        if hasattr(node, 'sym') and node.sym:
+            node.expr_type = node.sym['type']
+        else:
+            node.expr_type = 'error'
+
 # miscellaneous checks
 class Pass4_MiscChecks(ASTTraversal):
     def __init__(self, ast, symtab):
@@ -203,6 +223,6 @@ def check_semantics(ast):
 
     Pass1_GlobalDecls(ast, symtab).postorder()
     Pass2_LocalDecls(ast, symtab).preorder()
-
+    Pass3_TypeCheck(ast, symtab).postorder()
     Pass4_MiscChecks(ast, symtab).preorder()
     return ast
