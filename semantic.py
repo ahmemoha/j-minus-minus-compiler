@@ -168,6 +168,9 @@ class Pass3_TypeCheck(ASTTraversal):
     def __init__(self, ast, symtab):
         super().__init__(ast)
         self.symtab = symtab
+        self.current_function_return_type = None
+        self.type_table = { ... } # keep existing table
+
 
     # table driven type checking: (node_type, left_type, right_type) -> result_type
         self.type_table = {
@@ -290,6 +293,36 @@ class Pass3_TypeCheck(ASTTraversal):
             semantic_error("number/type of arguments doesn't match function declaration", id_node.lineno)
 
         node.expr_type = sym['rv']
+
+    # track current function context for return checks
+    def n_funcDecl(self, node):
+        self.current_function_return_type = node[0].attr
+
+    def n_funcDecl_exit(self, node):
+        self.current_function_return_type = None
+
+    def n_mainDecl(self, node):
+        self.current_function_return_type = 'void'
+
+    def n_mainDecl_exit(self, node):
+        self.current_function_return_type = None
+
+    # returns
+    def n_returnStmt(self, node):
+        # if there is a return value, it's at node[0]
+        # therwise no children
+        has_return_val = len(node) > 0
+
+        if self.current_function_return_type == 'void':
+            if has_return_val:
+                semantic_error("void function can't return a value", getattr(node, 'lineno', None))
+        else:
+            if not has_return_val:
+                semantic_error("non-void function must return a value", getattr(node, 'lineno', None))
+            else:
+                ret_type = getattr(node[0], 'expr_type', None)
+                if ret_type != self.current_function_return_type and ret_type != 'error':
+                    semantic_error("return value has wrong type", getattr(node, 'lineno', None))
 
 
 # miscellaneous checks
