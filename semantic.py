@@ -105,6 +105,7 @@ class Pass2_LocalDecls(ASTTraversal):
     def __init__(self, ast, symtab):
         super().__init__(ast)
         self.symtab = symtab
+        self.block_depth = 0
 
     def n_funcDecl(self, node):
         # entering a function: Open a new local scope
@@ -173,10 +174,35 @@ class Pass4_MiscChecks(ASTTraversal):
     def __init__(self, ast, symtab):
         super().__init__(ast)
         self.symtab = symtab
+        self.while_depth = 0
+
+    def n_whileStmt(self, node):
+        self.while_depth += 1
+
+    def n_whileStmt_exit(self, node):
+        self.while_depth -= 1
+
+    def n_breakStmt(self, node):
+        if self.while_depth == 0:
+            semantic_error("break statement outside while loop", getattr(node, 'lineno', None))
+
+    def n_exprStmt(self, node):
+        # statement expressions can only be assignments or function calls
+        child = node[0]
+        if child.type not in ('ASSIGN', 'funcCall'):
+            semantic_error("statement expression must be assignment or function invocation", getattr(child, 'lineno', getattr(node, 'lineno', None)))
+
+    def n_number(self, node):
+        # check if 32 bit signed integer is out of bounds
+        val = int(node.attr)
+        if not (-2147483648 <= val <= 2147483647):
+            semantic_error("integer literal out of range", node.lineno)
 
 def check_semantics(ast):
     symtab = SymbolTable()
 
     Pass1_GlobalDecls(ast, symtab).postorder()
+    Pass2_LocalDecls(ast, symtab).preorder()
 
+    Pass4_MiscChecks(ast, symtab).preorder()
     return ast
