@@ -366,8 +366,22 @@ class Pass3_TypeCheck(ASTTraversal):
         if self.return_type_stack:
             self.return_type_stack.pop()
 
+    def n_id(self, node):
+        name = node.attr
+        sym = self.symtab.lookup(name)
+        if not sym:
+            semantic_error(f"undeclared identifier '{name}'", node.lineno)
+            node.sig = 'error'
+            return
+
+        # attach sym first, then sig
+        node.sym = sym['sym_id']
+        node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
+
     # returns
-    # If we are somehow not in a function, just return safely
+    def n_returnStmt(self, node):
+        has_return_val = len(node) > 0
+        # if we are somehow not in a function, just return safely
         if not self.return_type_stack:
             return
 
