@@ -128,6 +128,10 @@ class Pass2_LocalDecls(ASTTraversal):
             var_type = formal[0].attr
             name = formal[1].attr
             lineno = formal[1].lineno
+            # add sig to formal node, its type, and its id
+            formal.sig = 'bool' if var_type == 'boolean' else var_type
+            formal[0].sig = 'bool' if var_type == 'boolean' else var_type
+            formal[1].sig = 'bool' if var_type == 'boolean' else var_type
             self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
 
     def n_funcDecl_exit(self, node):
@@ -141,6 +145,9 @@ class Pass2_LocalDecls(ASTTraversal):
             var_type = formal[0].attr
             name = formal[1].attr
             lineno = formal[1].lineno
+            formal.sig = 'bool' if var_type == 'boolean' else var_type
+            formal[0].sig = 'bool' if var_type == 'boolean' else var_type
+            formal[1].sig = 'bool' if var_type == 'boolean' else var_type
             self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
 
     def n_mainDecl_exit(self, node):
@@ -160,6 +167,12 @@ class Pass2_LocalDecls(ASTTraversal):
 
         var_type = node[0].attr
         name = node[1].attr
+        # add sig to varDecl, type, and id
+        sig_type = 'bool' if var_type == 'boolean' else var_type
+        node.sig = sig_type
+        node[0].sig = sig_type
+        node[1].sig = sig_type
+
         self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
 
     def n_id(self, node):
@@ -168,8 +181,9 @@ class Pass2_LocalDecls(ASTTraversal):
         sym = self.symtab.lookup(name)
         if not sym:
             semantic_error(f"undeclared identifier '{name}'", node.lineno)
-        # link the AST node directly to its symbol table entry!
-        node.sym = sym
+        # instead of attaching the whole dictionary we just add the sig
+        sig_type = 'bool' if sym['type'] == 'boolean' else sym['type']
+        node.sig = sig_type
 
     def n_funcCall(self, node):
         # node[0] is the id node of the function being called
