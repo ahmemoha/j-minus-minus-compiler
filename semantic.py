@@ -224,7 +224,8 @@ class Pass3_TypeCheck(ASTTraversal):
     def __init__(self, ast, symtab):
         super().__init__(ast)
         self.symtab = symtab
-        self.current_function_return_type = None
+        # use a list to act as a stack so we don't overwrite if things get deeply nested
+        self.return_type_stack = []
         self.type_table = {
        # table driven type checking: (node_type, left_type, right_type) -> result_type
             ('ADD', 'int', 'int'): 'int',
@@ -341,41 +342,39 @@ class Pass3_TypeCheck(ASTTraversal):
         rv_type = sym['rv']
         node.sig = 'bool' if rv_type == 'boolean' else rv_type
 
-
     # track current function context for return checks
     def n_funcDecl(self, node):
-        self.current_function_return_type = node[0].attr
+        rtype = node[0].attr
+        # push the expected return type
+        self.return_type_stack.append('bool' if rtype == 'boolean' else rtype)
 
     def n_funcDecl_exit(self, node):
-    # we don't reset this to None immediately because post order evaluations
-    # of the inner block and including returns happen before the exit hook,
-    # but the way ASTTraversal is structured, it's safer to just let it overwrite
-    # on the next function entry rather than clearing it
-        pass
+        if self.return_type_stack:
+            self.return_type_stack.pop()
 
     def n_mainDecl(self, node):
-        self.current_function_return_type = 'void'
+        # main returns void
+        self.return_type_stack.append('void')
 
     def n_mainDecl_exit(self, node):
         pass
 
     # returns
-    def n_returnStmt(self, node):
-        has_return_val = len(node) > 0
+    # If we are somehow not in a function, just return safely
+        if not self.return_type_stack:
+            return
 
-        # we must strictly check if the current tracked function is void
-        if self.current_function_return_type == 'void':
+        expected_return = self.return_type_stack[-1]
+
+        if expected_return == 'void':
             if has_return_val:
                 semantic_error("void function can't return a value", getattr(node, 'lineno', None))
         else:
             if not has_return_val:
-                # to match reference compiler format exactly
-                function_name = "function" # we could extract the exact name, but generic suffices
                 semantic_error("no return statement in non-void function", getattr(node, 'lineno', None))
             else:
                 ret_type = getattr(node[0], 'sig', None)
-                expected = 'bool' if self.current_function_return_type == 'boolean' else self.current_function_return_type
-                if ret_type != expected and ret_type != 'error':
+                if ret_type != expected_return and ret_type != 'error':
                     semantic_error("return value has wrong type", getattr(node, 'lineno', None))
 
 
