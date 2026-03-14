@@ -406,23 +406,28 @@ class Pass4_MiscChecks(ASTTraversal):
         self.symtab = symtab
         self.while_depth = 0
 
+        # State tracking for return statements
+        self.current_func_name = None
+        self.current_func_is_void = True
+        self.found_return = False
 
     def n_funcDecl(self, node):
-        # children: [type, id, formals, block]
-        # only non void functions need a return
-        rtype = node[0].attr
-        if rtype != 'void':
-            block_node = node[3]
-            has_return = False
-            # do a shallow search for a return statement
-            for child in getattr(block_node, 'children', []):
-                if getattr(child, 'type', None) == 'returnStmt':
-                    has_return = True
-                    break
+        # when we enter a function, record its name and whether it needs a return
+        self.current_func_name = node[1].attr
+        self.current_func_is_void = (node[0].attr == 'void')
+        self.found_return = False
 
-            if not has_return:
-                func_name = node[1].attr
-                semantic_error(f"no return statement in non-void function '{func_name}'")
+    def n_returnStmt(self, node):
+        # if we hit a return statement anywhere in the function, flip the flag
+        self.found_return = True
+
+    def n_funcDecl_exit(self, node):
+        # when we exit the function, check if we found what we needed
+        if not self.current_func_is_void and not self.found_return:
+            semantic_error(f"no return statement in non-void function '{self.current_func_name}'")
+
+        # reset state
+        self.current_func_name = None
 
     def n_whileStmt(self, node):
         self.while_depth += 1
