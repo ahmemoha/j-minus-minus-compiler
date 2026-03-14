@@ -146,16 +146,22 @@ class Pass2_LocalDecls(ASTTraversal):
             var_type = formal[0].attr
             name = formal[1].attr
             lineno = formal[1].lineno
-            # add sig to formal node, its type, and its id
-            formal.sig = 'bool' if var_type == 'boolean' else var_type
-            formal[0].sig = 'bool' if var_type == 'boolean' else var_type
-            formal[1].sig = 'bool' if var_type == 'boolean' else var_type
+
             self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
+
+            sig_type = 'bool' if var_type == 'boolean' else var_type
+            formal.sig = sig_type
+            formal[0].sig = sig_type
+            formal[1].sig = sig_type
+            # Attach the sym string to the identifier node
+            formal[1].sym = self.symtab.lookup(name)['sym_id']
+
 
     def n_funcDecl_exit(self, node):
         # exiting a function: Close the local scope
         self.symtab.close_scope()
 
+    # apply the same logic to mainDecl
     def n_mainDecl(self, node):
         self.symtab.open_scope()
         formals_node = node[2]
@@ -163,10 +169,13 @@ class Pass2_LocalDecls(ASTTraversal):
             var_type = formal[0].attr
             name = formal[1].attr
             lineno = formal[1].lineno
-            formal.sig = 'bool' if var_type == 'boolean' else var_type
-            formal[0].sig = 'bool' if var_type == 'boolean' else var_type
-            formal[1].sig = 'bool' if var_type == 'boolean' else var_type
             self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
+
+            sig_type = 'bool' if var_type == 'boolean' else var_type
+            formal.sig = sig_type
+            formal[0].sig = sig_type
+            formal[1].sig = sig_type
+            formal[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_mainDecl_exit(self, node):
         self.symtab.close_scope()
@@ -185,13 +194,14 @@ class Pass2_LocalDecls(ASTTraversal):
 
         var_type = node[0].attr
         name = node[1].attr
-        # add sig to varDecl, type, and id
+        self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
+
         sig_type = 'bool' if var_type == 'boolean' else var_type
         node.sig = sig_type
         node[0].sig = sig_type
         node[1].sig = sig_type
-
-        self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
+        # Attach the sym string to the identifier node
+        node[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_id(self, node):
         # lookup the identifier in the scope stack
@@ -200,8 +210,9 @@ class Pass2_LocalDecls(ASTTraversal):
         if not sym:
             semantic_error(f"undeclared identifier '{name}'", node.lineno)
         # instead of attaching the whole dictionary we just add the sig
-        sig_type = 'bool' if sym['type'] == 'boolean' else sym['type']
-        node.sig = sig_type
+        node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
+        # for every usage of an ID attach its sym_id so it prints cleanly
+        node.sym = sym['sym_id']
 
     def n_funcCall(self, node):
         # node[0] is the id node of the function being called
