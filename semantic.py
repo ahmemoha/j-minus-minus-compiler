@@ -238,6 +238,36 @@ class Pass3_TypeCheck(ASTTraversal):
         else:
             node.expr_type = 'error'
 
+    # unary operators
+    def n_UMINUS(self, node):
+        child_type = getattr(node[0], 'expr_type', None)
+        if child_type != 'int':
+            semantic_error("type mismatch for operator '-'", node.lineno)
+        node.expr_type = 'int'
+
+    def n_NOT(self, node):
+        child_type = getattr(node[0], 'expr_type', None)
+        if child_type != 'boolean':
+            semantic_error("type mismatch for operator '!'", node.lineno)
+        node.expr_type = 'boolean'
+
+    # control flow
+    def check_condition(self, condition_node):
+        cond_type = getattr(condition_node, 'expr_type', None)
+        if cond_type != 'boolean' and cond_type != 'error':
+            semantic_error("condition must be of boolean type", getattr(condition_node, 'lineno', None))
+
+    def n_ifStmt(self, node):
+        self.check_condition(node[0])
+
+    def n_ifElseStmt(self, node):
+        self.check_condition(node[0])
+
+    def n_whileStmt(self, node):
+        # the whileStmt in the AST has condition at index 0
+        self.check_condition(node[0])
+
+
 # miscellaneous checks
 class Pass4_MiscChecks(ASTTraversal):
     def __init__(self, ast, symtab):
