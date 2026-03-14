@@ -169,7 +169,56 @@ class Pass3_TypeCheck(ASTTraversal):
         super().__init__(ast)
         self.symtab = symtab
 
-    # --- Leaf Nodes ---
+    # table driven type checking: (node_type, left_type, right_type) -> result_type
+        self.type_table = {
+            ('ADD', 'int', 'int'): 'int',
+            ('SUB', 'int', 'int'): 'int',
+            ('MUL', 'int', 'int'): 'int',
+            ('DIV', 'int', 'int'): 'int',
+            ('MOD', 'int', 'int'): 'int',
+            ('LT', 'int', 'int'): 'boolean',
+            ('GT', 'int', 'int'): 'boolean',
+            ('LE', 'int', 'int'): 'boolean',
+            ('GE', 'int', 'int'): 'boolean',
+            ('EQ', 'int', 'int'): 'boolean',
+            ('EQ', 'boolean', 'boolean'): 'boolean',
+            ('NE', 'int', 'int'): 'boolean',
+            ('NE', 'boolean', 'boolean'): 'boolean',
+            ('AND', 'boolean', 'boolean'): 'boolean',
+            ('OR', 'boolean', 'boolean'): 'boolean',
+            ('ASSIGN', 'int', 'int'): 'int',
+            ('ASSIGN', 'boolean', 'boolean'): 'boolean',
+        }
+
+    # binary operators
+    def default_binary_op(self, node):
+        left_type = getattr(node[0], 'expr_type', None)
+        right_type = getattr(node[1], 'expr_type', None)
+
+        result_type = self.type_table.get((node.type, left_type, right_type))
+        if result_type is None:
+            if left_type != 'error' and right_type != 'error':
+                semantic_error(f"type mismatch for operator '{node.type}'", getattr(node, 'lineno', None))
+            node.expr_type = 'error'
+        else:
+            node.expr_type = result_type
+
+    def n_ADD(self, node): self.default_binary_op(node)
+    def n_SUB(self, node): self.default_binary_op(node)
+    def n_MUL(self, node): self.default_binary_op(node)
+    def n_DIV(self, node): self.default_binary_op(node)
+    def n_MOD(self, node): self.default_binary_op(node)
+    def n_LT(self, node): self.default_binary_op(node)
+    def n_GT(self, node): self.default_binary_op(node)
+    def n_LE(self, node): self.default_binary_op(node)
+    def n_GE(self, node): self.default_binary_op(node)
+    def n_EQ(self, node): self.default_binary_op(node)
+    def n_NE(self, node): self.default_binary_op(node)
+    def n_AND(self, node): self.default_binary_op(node)
+    def n_OR(self, node): self.default_binary_op(node)
+    def n_ASSIGN(self, node): self.default_binary_op(node)
+
+    # leaf nodes
     def n_number(self, node):
         node.expr_type = 'int'
 
@@ -183,7 +232,7 @@ class Pass3_TypeCheck(ASTTraversal):
         node.expr_type = 'string'
 
     def n_id(self, node):
-        # Inherit the type from the symbol table we attached in Pass 2
+        # inherit the type from the symbol table we attached in pass 2
         if hasattr(node, 'sym') and node.sym:
             node.expr_type = node.sym['type']
         else:
