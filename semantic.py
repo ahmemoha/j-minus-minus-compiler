@@ -72,10 +72,14 @@ class Pass1_GlobalDecls(ASTTraversal):
         var_type = node[0].attr
         name = node[1].attr
         lineno = node[1].lineno
+
+        self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
+
         # add sig to the type and id nodes
         node[0].sig = var_type
         node[1].sig = var_type
-        self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
+        # lookup the symbol we just defined to grab its sym_id
+        node[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_funcDecl(self, node):
         # children: [type, id, formals, block]
@@ -93,11 +97,13 @@ class Pass1_GlobalDecls(ASTTraversal):
         sig_args = ['bool' if t == 'boolean' else t for t in arg_types]
         sig = f"f({','.join(sig_args)})"
 
+        self.symtab.define(name, {'type': sig, 'rv': rtype, 'node': node}, lineno)
+
         # add sig to the type and id nodes
         node[0].sig = 'bool' if rtype == 'boolean' else rtype
         node[1].sig = sig
+        node[1].sym = self.symtab.lookup(name)['sym_id']
 
-        self.symtab.define(name, {'type': sig, 'rv': rtype, 'node': node}, lineno)
 
     def n_mainDecl(self, node):
         # children: [void, id, formals, block]
@@ -111,13 +117,13 @@ class Pass1_GlobalDecls(ASTTraversal):
         formals_node = node[2]
         if len(formals_node) > 0:
             semantic_error("main declaration can't have parameters", lineno)
+        # define main in the symbol table
+        self.symtab.define(name, {'type': 'f()', 'rv': 'void', 'node': node}, lineno)
 
         # add sig to the void and id nodes
         node[0].sig = 'void'
         node[1].sig = 'f()'
-
-        # define main in the symbol table
-        self.symtab.define(name, {'type': 'f()', 'rv': 'void', 'node': node}, lineno)
+        node[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_program(self, node):
         # because this is a post order traversal, n_program runs LAST,
