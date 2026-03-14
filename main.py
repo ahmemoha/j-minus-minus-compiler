@@ -19,10 +19,9 @@ class FatalErrorListener(ErrorListener):
 
 # custom string class just above main()
 class SymString(str):
-    """A custom string that doesn't print with quotes in repr()"""
+    """ this tricks Python into printing sym7 instead of 'sym7'"""
     def __repr__(self):
-        return str(self)
-
+        return self
 
 # inside main, right before you print the AST, iterate through it to wrap sym strings
 def fix_sym_quotes(node):
