@@ -196,42 +196,39 @@ class Pass3_TypeCheck(ASTTraversal):
         super().__init__(ast)
         self.symtab = symtab
         self.current_function_return_type = None
-        self.type_table = { ... } # keep existing table
-
-
-    # table driven type checking: (node_type, left_type, right_type) -> result_type
         self.type_table = {
+       # table driven type checking: (node_type, left_type, right_type) -> result_type
             ('ADD', 'int', 'int'): 'int',
             ('SUB', 'int', 'int'): 'int',
             ('MUL', 'int', 'int'): 'int',
             ('DIV', 'int', 'int'): 'int',
             ('MOD', 'int', 'int'): 'int',
-            ('LT', 'int', 'int'): 'boolean',
-            ('GT', 'int', 'int'): 'boolean',
-            ('LE', 'int', 'int'): 'boolean',
-            ('GE', 'int', 'int'): 'boolean',
-            ('EQ', 'int', 'int'): 'boolean',
-            ('EQ', 'boolean', 'boolean'): 'boolean',
-            ('NE', 'int', 'int'): 'boolean',
-            ('NE', 'boolean', 'boolean'): 'boolean',
-            ('AND', 'boolean', 'boolean'): 'boolean',
-            ('OR', 'boolean', 'boolean'): 'boolean',
+            ('LT', 'int', 'int'): 'bool',
+            ('GT', 'int', 'int'): 'bool',
+            ('LE', 'int', 'int'): 'bool',
+            ('GE', 'int', 'int'): 'bool',
+            ('EQ', 'int', 'int'): 'bool',
+            ('EQ', 'bool', 'bool'): 'bool',
+            ('NE', 'int', 'int'): 'bool',
+            ('NE', 'bool', 'bool'): 'bool',
+            ('AND', 'bool', 'bool'): 'bool',
+            ('OR', 'bool', 'bool'): 'bool',
             ('ASSIGN', 'int', 'int'): 'int',
-            ('ASSIGN', 'boolean', 'boolean'): 'boolean',
+            ('ASSIGN', 'bool', 'bool'): 'bool',
         }
 
     # binary operators
     def default_binary_op(self, node):
-        left_type = getattr(node[0], 'expr_type', None)
-        right_type = getattr(node[1], 'expr_type', None)
+        left_type = getattr(node[0], 'sig', None)
+        right_type = getattr(node[1], 'sig', None)
 
         result_type = self.type_table.get((node.type, left_type, right_type))
         if result_type is None:
             if left_type != 'error' and right_type != 'error':
                 semantic_error(f"type mismatch for operator '{node.type}'", getattr(node, 'lineno', None))
-            node.expr_type = 'error'
+            node.sig = 'error'
         else:
-            node.expr_type = result_type
+            node.sig = result_type
 
     def n_ADD(self, node): self.default_binary_op(node)
     def n_SUB(self, node): self.default_binary_op(node)
@@ -250,41 +247,34 @@ class Pass3_TypeCheck(ASTTraversal):
 
     # leaf nodes
     def n_number(self, node):
-        node.expr_type = 'int'
+        node.sig = 'int'
 
     def n_true(self, node):
-        node.expr_type = 'boolean'
+        node.sig = 'bool'
 
     def n_false(self, node):
-        node.expr_type = 'boolean'
+        node.sig = 'bool'
 
     def n_string(self, node):
-        node.expr_type = 'string'
-
-    def n_id(self, node):
-        # inherit the type from the symbol table we attached in pass 2
-        if hasattr(node, 'sym') and node.sym:
-            node.expr_type = node.sym['type']
-        else:
-            node.expr_type = 'error'
+        node.sig = 'string'
 
     # unary operators
     def n_UMINUS(self, node):
-        child_type = getattr(node[0], 'expr_type', None)
+        child_type = getattr(node[0], 'sig', None)
         if child_type != 'int':
             semantic_error("type mismatch for operator '-'", node.lineno)
-        node.expr_type = 'int'
+        node.sig = 'int'
 
     def n_NOT(self, node):
-        child_type = getattr(node[0], 'expr_type', None)
-        if child_type != 'boolean':
+        child_type = getattr(node[0], 'sig', None)
+        if child_type != 'bool':
             semantic_error("type mismatch for operator '!'", node.lineno)
-        node.expr_type = 'boolean'
+        node.sig = 'bool'
 
     # control flow
     def check_condition(self, condition_node):
-        cond_type = getattr(condition_node, 'expr_type', None)
-        if cond_type != 'boolean' and cond_type != 'error':
+        cond_type = getattr(condition_node, 'sig', None)
+        if cond_type != 'bool' and cond_type != 'error':
             semantic_error("condition must be of boolean type", getattr(condition_node, 'lineno', None))
 
     def n_ifStmt(self, node):
@@ -300,9 +290,9 @@ class Pass3_TypeCheck(ASTTraversal):
     # function calls
     def n_funcCall(self, node):
         id_node = node[0]
-        sym = getattr(id_node, 'sym', None)
+        sym = self.symtab.lookup(id_node.attr) # lookup manually since we dropped node.sym
         if not sym:
-            node.expr_type = 'error'
+            node.sig = 'error'
             return
 
         expected_sig = sym['type'] # example like 'f(int,boolean)'
@@ -311,7 +301,7 @@ class Pass3_TypeCheck(ASTTraversal):
         actuals_node = node[1] if len(node) > 1 else []
         actual_types = []
         for arg in actuals_node:
-            t = getattr(arg, 'expr_type', 'error')
+            t = getattr(arg, 'sig', 'error')
             actual_types.append(t)
 
         actual_sig = f"f({','.join(actual_types)})"
@@ -319,7 +309,9 @@ class Pass3_TypeCheck(ASTTraversal):
         if expected_sig != actual_sig:
             semantic_error("number/type of arguments doesn't match function declaration", id_node.lineno)
 
-        node.expr_type = sym['rv']
+        rv_type = sym['rv']
+        node.sig = 'bool' if rv_type == 'boolean' else rv_type
+
 
     # track current function context for return checks
     def n_funcDecl(self, node):
@@ -336,8 +328,6 @@ class Pass3_TypeCheck(ASTTraversal):
 
     # returns
     def n_returnStmt(self, node):
-        # if there is a return value, it's at node[0]
-        # therwise no children
         has_return_val = len(node) > 0
 
         if self.current_function_return_type == 'void':
@@ -345,10 +335,11 @@ class Pass3_TypeCheck(ASTTraversal):
                 semantic_error("void function can't return a value", getattr(node, 'lineno', None))
         else:
             if not has_return_val:
-                semantic_error("non-void function must return a value", getattr(node, 'lineno', None))
+                semantic_error(f"no return statement in non-void function", getattr(node, 'lineno', None))
             else:
-                ret_type = getattr(node[0], 'expr_type', None)
-                if ret_type != self.current_function_return_type and ret_type != 'error':
+                ret_type = getattr(node[0], 'sig', None)
+                expected = 'bool' if self.current_function_return_type == 'boolean' else self.current_function_return_type
+                if ret_type != expected and ret_type != 'error':
                     semantic_error("return value has wrong type", getattr(node, 'lineno', None))
 
 
