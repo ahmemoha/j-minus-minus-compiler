@@ -17,6 +17,24 @@ class FatalErrorListener(ErrorListener):
         sys.stderr.write(f"error: {msg} at or near line {line}\n")
         sys.exit(1)
 
+# custom string class just above main()
+class SymString(str):
+    """A custom string that doesn't print with quotes in repr()"""
+    def __repr__(self):
+        return str(self)
+
+
+# inside main, right before you print the AST, iterate through it to wrap sym strings
+def fix_sym_quotes(node):
+    if not hasattr(node, 'type'):
+        return
+    if hasattr(node, 'sym') and isinstance(node.sym, str):
+        # wrap the sym_id in our custom string class so it prints without quotes
+        node.sym = SymString(node.sym)
+    for child in getattr(node, 'children', []):
+        fix_sym_quotes(child)
+
+
 def fold_uminus(node):
     # if it's not an AST node like a raw token, just return it
     if not hasattr(node, 'type'):
@@ -97,6 +115,9 @@ def main():
 
     # perform semantic checking, that would decorate the AST and catches errors
     ast = check_semantics(ast)
+
+    # fix the quote formatting right before printing
+    fix_sym_quotes(ast)
 
     # print the textual representation of the AST
     print(ast)
