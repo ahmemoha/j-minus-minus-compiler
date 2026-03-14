@@ -75,11 +75,13 @@ class Pass1_GlobalDecls(ASTTraversal):
 
         self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
 
+        # attach sym first, then sig
+        # lookup the symbol we just defined to grab its sym_id
+        node[1].sym = self.symtab.lookup(name)['sym_id']
+
         # add sig to the type and id nodes
         node[0].sig = var_type
         node[1].sig = var_type
-        # lookup the symbol we just defined to grab its sym_id
-        node[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_funcDecl(self, node):
         # children: [type, id, formals, block]
@@ -89,9 +91,7 @@ class Pass1_GlobalDecls(ASTTraversal):
 
         # extract parameter types to build the signature
         formals_node = node[2]
-        arg_types = []
-        for formal in formals_node:
-            arg_types.append(formal[0].attr)
+        arg_types = [formal[0].attr for formal in formals_node]
 
         # map boolean to bool for the signature to match reference compiler
         sig_args = ['bool' if t == 'boolean' else t for t in arg_types]
@@ -99,10 +99,11 @@ class Pass1_GlobalDecls(ASTTraversal):
 
         self.symtab.define(name, {'type': sig, 'rv': rtype, 'node': node}, lineno)
 
+        # attach sym first, then sig
+        node[1].sym = self.symtab.lookup(name)['sym_id']
         # add sig to the type and id nodes
         node[0].sig = 'bool' if rtype == 'boolean' else rtype
         node[1].sig = sig
-        node[1].sym = self.symtab.lookup(name)['sym_id']
 
 
     def n_mainDecl(self, node):
@@ -120,10 +121,11 @@ class Pass1_GlobalDecls(ASTTraversal):
         # define main in the symbol table
         self.symtab.define(name, {'type': 'f()', 'rv': 'void', 'node': node}, lineno)
 
+        # attach sym first, then sig
+        node[1].sym = self.symtab.lookup(name)['sym_id']
         # add sig to the void and id nodes
         node[0].sig = 'void'
         node[1].sig = 'f()'
-        node[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_program(self, node):
         # because this is a post order traversal, n_program runs LAST,
@@ -197,11 +199,15 @@ class Pass2_LocalDecls(ASTTraversal):
         self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
 
         sig_type = 'bool' if var_type == 'boolean' else var_type
+
+        # attach sym first
+        # Attach the sym string to the identifier node
+        node[1].sym = self.symtab.lookup(name)['sym_id']
+
+        # then attch sig
         node.sig = sig_type
         node[0].sig = sig_type
         node[1].sig = sig_type
-        # Attach the sym string to the identifier node
-        node[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_id(self, node):
         # lookup the identifier in the scope stack
