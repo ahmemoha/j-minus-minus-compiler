@@ -347,24 +347,31 @@ class Pass3_TypeCheck(ASTTraversal):
         self.current_function_return_type = node[0].attr
 
     def n_funcDecl_exit(self, node):
-        self.current_function_return_type = None
+    # we don't reset this to None immediately because post order evaluations
+    # of the inner block and including returns happen before the exit hook,
+    # but the way ASTTraversal is structured, it's safer to just let it overwrite
+    # on the next function entry rather than clearing it
+        pass
 
     def n_mainDecl(self, node):
         self.current_function_return_type = 'void'
 
     def n_mainDecl_exit(self, node):
-        self.current_function_return_type = None
+        pass
 
     # returns
     def n_returnStmt(self, node):
         has_return_val = len(node) > 0
 
+        # we must strictly check if the current tracked function is void
         if self.current_function_return_type == 'void':
             if has_return_val:
                 semantic_error("void function can't return a value", getattr(node, 'lineno', None))
         else:
             if not has_return_val:
-                semantic_error(f"no return statement in non-void function", getattr(node, 'lineno', None))
+                # to match reference compiler format exactly
+                function_name = "function" # we could extract the exact name, but generic suffices
+                semantic_error("no return statement in non-void function", getattr(node, 'lineno', None))
             else:
                 ret_type = getattr(node[0], 'sig', None)
                 expected = 'bool' if self.current_function_return_type == 'boolean' else self.current_function_return_type
