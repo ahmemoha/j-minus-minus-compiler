@@ -357,7 +357,8 @@ class Pass3_TypeCheck(ASTTraversal):
         self.return_type_stack.append('void')
 
     def n_mainDecl_exit(self, node):
-        pass
+        if self.return_type_stack:
+            self.return_type_stack.pop()
 
     # returns
     # If we are somehow not in a function, just return safely
@@ -384,6 +385,24 @@ class Pass4_MiscChecks(ASTTraversal):
         super().__init__(ast)
         self.symtab = symtab
         self.while_depth = 0
+
+
+    def n_funcDecl(self, node):
+        # children: [type, id, formals, block]
+        # only non void functions need a return
+        rtype = node[0].attr
+        if rtype != 'void':
+            block_node = node[3]
+            has_return = False
+            # do a shallow search for a return statement
+            for child in getattr(block_node, 'children', []):
+                if getattr(child, 'type', None) == 'returnStmt':
+                    has_return = True
+                    break
+
+            if not has_return:
+                func_name = node[1].attr
+                semantic_error(f"no return statement in non-void function '{func_name}'")
 
     def n_whileStmt(self, node):
         self.while_depth += 1
