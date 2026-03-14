@@ -16,18 +16,25 @@ class SymbolTable:
         # index 1 is global declarations
         # index 2+ are local scopes
         self.stack = [{}]
+        self.next_sym_id = 1 # keep track of the global symbol counter
         self._init_predefined_functions()
         # Open the global scope immediately
         self.open_scope()
 
     def _init_predefined_functions(self):
-        # store the signature as 'f(arg_type)' and the return type as 'RV=return_type'
-        self.stack[0]['getchar'] = {'type': 'f()', 'rv': 'int'}
-        self.stack[0]['halt'] = {'type': 'f()', 'rv': 'void'}
-        self.stack[0]['printb'] = {'type': 'f(boolean)', 'rv': 'void'}
-        self.stack[0]['printc'] = {'type': 'f(int)', 'rv': 'void'}
-        self.stack[0]['printi'] = {'type': 'f(int)', 'rv': 'void'}
-        self.stack[0]['prints'] = {'type': 'f(string)', 'rv': 'void'}
+        # manually assign sym1 through sym6 to predefined functions to exactly match reference
+        predefs = [
+            ('prints', 'f(string)', 'void'),
+            ('printi', 'f(int)', 'void'),
+            ('printb', 'f(bool)', 'void'),
+            ('printc', 'f(int)', 'void'),
+            ('getchar', 'f()', 'int'),
+            ('halt', 'f()', 'void')
+        ]
+        for name, sig, rv in predefs:
+            sym_id = f"sym{self.next_sym_id}"
+            self.next_sym_id += 1
+            self.stack[0][name] = {'type': sig, 'rv': rv, 'sym_id': sym_id}
 
     def open_scope(self):
         self.stack.append({})
@@ -39,6 +46,11 @@ class SymbolTable:
         current_scope = self.stack[-1]
         if name in current_scope:
             semantic_error(f"'{name}' redefined", lineno)
+
+        # assign the next available sym_id to this newly defined variable/function
+        sym_id = f"sym{self.next_sym_id}"
+        self.next_sym_id += 1
+        attrs['sym_id'] = sym_id
         current_scope[name] = attrs
 
     def lookup(self, name):
