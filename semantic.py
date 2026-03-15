@@ -229,8 +229,6 @@ class Pass3_TypeCheck(ASTTraversal):
     def __init__(self, ast, symtab):
         super().__init__(ast)
         self.symtab = symtab
-        # use a list to act as a stack so we don't overwrite if things get deeply nested
-        self.return_type_stack = []
         self.type_table = {
        # table driven type checking: (node_type, left_type, right_type) -> result_type
             ('ADD', 'int', 'int'): 'int',
@@ -347,24 +345,6 @@ class Pass3_TypeCheck(ASTTraversal):
         rv_type = sym['rv']
         node.sig = 'bool' if rv_type == 'boolean' else rv_type
 
-    # track current function context for return checks
-    def n_funcDecl(self, node):
-        rtype = node[0].attr
-        # push the expected return type
-        self.return_type_stack.append('bool' if rtype == 'boolean' else rtype)
-
-    def n_funcDecl_exit(self, node):
-        if self.return_type_stack:
-            self.return_type_stack.pop()
-
-    def n_mainDecl(self, node):
-        # main returns void
-        self.return_type_stack.append('void')
-
-    def n_mainDecl_exit(self, node):
-        if self.return_type_stack:
-            self.return_type_stack.pop()
-
     def n_id(self, node):
         name = node.attr
         sym = self.symtab.lookup(name)
@@ -377,29 +357,6 @@ class Pass3_TypeCheck(ASTTraversal):
         node.sym = sym['sym_id']
         node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
 
-    # returns
-    def n_returnStmt(self, node):
-        has_return_val = len(node) > 0
-        # if we are somehow not in a function, just return safely
-        if not self.return_type_stack:
-            return
-
-        expected_return = self.return_type_stack[-1]
-
-        if expected_return == 'void':
-            if has_return_val:
-                # match refernce complier exactly
-                semantic_error("this function can't return a value", getattr(node, 'lineno', None))
-        else:
-            if not has_return_val:
-                # match refernce complier exactly
-                semantic_error("this function must return a value", getattr(node, 'lineno', None))
-            else:
-                ret_type = getattr(node[0], 'sig', None)
-                if ret_type != expected_return and ret_type != 'error':
-                    semantic_error("return value has wrong type", getattr(node, 'lineno', None))
-
-
 # miscellaneous checks
 class Pass4_MiscChecks(ASTTraversal):
     def __init__(self, ast, symtab):
@@ -407,28 +364,47 @@ class Pass4_MiscChecks(ASTTraversal):
         self.symtab = symtab
         self.while_depth = 0
 
-        # State tracking for return statements
+        # state tracking for returns
         self.current_func_name = None
-        self.current_func_is_void = True
+        self.current_return_type = None
         self.found_return = False
 
     def n_funcDecl(self, node):
-        # when we enter a function, record its name and whether it needs a return
+        rtype = node[0].attr
         self.current_func_name = node[1].attr
-        self.current_func_is_void = (node[0].attr == 'void')
+        self.current_return_type = 'bool' if rtype == 'boolean' else rtype
         self.found_return = False
 
-    def n_returnStmt(self, node):
-        # if we hit a return statement anywhere in the function, flip the flag
-        self.found_return = True
-
     def n_funcDecl_exit(self, node):
-        # when we exit the function, check if we found what we needed
-        if not self.current_func_is_void and not self.found_return:
+        # triggered if there is no return statement AT ALL in a non void function
+        if self.current_return_type != 'void' and not self.found_return:
             semantic_error(f"no return statement in non-void function '{self.current_func_name}'")
-
-        # reset state
         self.current_func_name = None
+        self.current_return_type = None
+
+    def n_mainDecl(self, node):
+        self.current_func_name = 'main'
+        self.current_return_type = 'void'
+        self.found_return = False
+
+    def n_mainDecl_exit(self, node):
+        self.current_func_name = None
+        self.current_return_type = None
+
+    def n_returnStmt(self, node):
+        self.found_return = True
+        has_return_val = len(node) > 0
+
+        if self.current_return_type == 'void':
+            if has_return_val:
+                semantic_error("this function can't return a value", getattr(node, 'lineno', None))
+        else:
+            if not has_return_val:
+                semantic_error("this function must return a value", getattr(node, 'lineno', None))
+            else:
+                ret_type = getattr(node[0], 'sig', None)
+                if ret_type != self.current_return_type and ret_type != 'error':
+                    semantic_error("return value has wrong type", getattr(node, 'lineno', None))
 
     def n_whileStmt(self, node):
         self.while_depth += 1
