@@ -258,7 +258,15 @@ class Pass3_TypeCheck(ASTTraversal):
         result_type = self.type_table.get((node.type, left_type, right_type))
         if result_type is None:
             if left_type != 'error' and right_type != 'error':
-                semantic_error(f"type mismatch for operator '{node.type}'", getattr(node, 'lineno', None))
+                # map AST names back to symbols for the error message
+                op_map = {
+                    'ADD': '+', 'SUB': '-', 'MUL': '*', 'DIV': '/', 'MOD': '%',
+                    'LT': '<', 'GT': '>', 'LE': '<=', 'GE': '>=',
+                    'EQ': '==', 'NE': '!=', 'AND': '&&', 'OR': '||', 'ASSIGN': '='
+                }
+                op_str = op_map.get(node.type, node.type)
+                # changed to "type mismatch for '+'"
+                semantic_error(f"type mismatch for '{op_str}'", getattr(node, 'lineno', None))
             node.sig = 'error'
         else:
             node.sig = result_type
