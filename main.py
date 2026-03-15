@@ -8,6 +8,7 @@ from JminusParser import JminusParser
 from cpsc411.astshaper import ASTShaper
 from cpsc411.ast import AST
 from semantic import check_semantics
+import re
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
@@ -118,8 +119,14 @@ def main():
     # fix the quote formatting right before printing
     fix_sym_quotes(ast)
 
+    # convert the AST to a string then strip the quotes around sym='symX'
+    output = str(ast)
+
+    # this regex looks for sym='sym...' and replaces it with sym=sym
+    output = re.sub(r"sym='(sym\d+)'", r"sym=\1", output)
+
     # print the textual representation of the AST
-    print(ast)
+    print(output)
 
 if __name__ == '__main__':
     main()
