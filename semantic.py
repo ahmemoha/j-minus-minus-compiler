@@ -389,10 +389,12 @@ class Pass3_TypeCheck(ASTTraversal):
 
         if expected_return == 'void':
             if has_return_val:
-                semantic_error("void function can't return a value", getattr(node, 'lineno', None))
+                # match refernce complier exactly
+                semantic_error("this function can't return a value", getattr(node, 'lineno', None))
         else:
             if not has_return_val:
-                semantic_error("no return statement in non-void function", getattr(node, 'lineno', None))
+                # match refernce complier exactly
+                semantic_error("this function must return a value", getattr(node, 'lineno', None))
             else:
                 ret_type = getattr(node[0], 'sig', None)
                 if ret_type != expected_return and ret_type != 'error':
