@@ -221,7 +221,8 @@ class Pass2_LocalDecls(ASTTraversal):
     def n_funcCall(self, node):
         # node[0] is the id node of the function being called
         if node[0].attr == 'main':
-            semantic_error("main function can't be called", node[0].lineno)
+            # change from "main function can't be called"
+            semantic_error("can't call the main function", node[0].lineno)
 
 # type checking
 class Pass3_TypeCheck(ASTTraversal):
