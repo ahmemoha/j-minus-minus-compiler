@@ -212,6 +212,8 @@ class Pass2_LocalDecls(ASTTraversal):
         node[1].sig = sig_type
 
     def n_id(self, node):
+        if hasattr(node, 'sym'):
+            return
         # lookup the identifier in the scope stack
         name = node.attr
         sym = self.symtab.lookup(name)
