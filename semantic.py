@@ -308,7 +308,8 @@ class Pass3_TypeCheck(ASTTraversal):
     def check_condition(self, condition_node):
         cond_type = getattr(condition_node, 'sig', None)
         if cond_type != 'bool' and cond_type != 'error':
-            semantic_error("condition must be of boolean type", getattr(condition_node, 'lineno', None))
+            # changed from "condition must be of boolean type"
+            semantic_error("need a boolean expression", getattr(condition_node, 'lineno', None))
 
     def n_ifStmt(self, node):
         self.check_condition(node[0])
@@ -409,7 +410,7 @@ class Pass4_MiscChecks(ASTTraversal):
     def n_exprStmt(self, node):
         # statement expressions can only be assignments or function calls
         child = node[0]
-        f child.type not in ('ASSIGN', 'funcCall'):
+        if child.type not in ('ASSIGN', 'funcCall'):
             # change from "statement expression must be assignment or function invocation"
             semantic_error("must be assignment or function call", getattr(child, 'lineno', getattr(node, 'lineno', None)))
 
