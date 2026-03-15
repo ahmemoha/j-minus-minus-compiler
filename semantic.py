@@ -200,7 +200,7 @@ class Pass2_LocalDecls(ASTTraversal):
         sig_type = 'bool' if var_type == 'boolean' else var_type
 
         # attach sym first
-        # Attach the sym string to the identifier node
+        # attach the sym string to the identifier node
         node[1].sym = self.symtab.lookup(name)['sym_id']
 
         # then attch sig
@@ -213,8 +213,9 @@ class Pass2_LocalDecls(ASTTraversal):
         name = node.attr
         sym = self.symtab.lookup(name)
         if not sym:
-            semantic_error(f"undeclared identifier '{name}'", node.lineno)
-        # Attach sym first then sig to match reference compiler formatting
+            # changed from "undeclared identifier"
+            semantic_error(f"unknown identifier '{name}'", node.lineno)
+        # attach sym first then sig to match reference compiler formatting
         node.sym = sym['sym_id']
         node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
 
