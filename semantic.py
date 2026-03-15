@@ -112,7 +112,7 @@ class Pass1_GlobalDecls(ASTTraversal):
         lineno = node[1].lineno
 
         if self.main_found:
-            semantic_error("multiple main declarations found", lineno)
+            semantic_error("multiple main declarations found") # remove lineno argument
         self.main_found = True
 
         formals_node = node[2]
