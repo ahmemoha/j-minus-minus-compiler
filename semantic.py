@@ -402,7 +402,8 @@ class Pass4_MiscChecks(ASTTraversal):
 
     def n_breakStmt(self, node):
         if self.while_depth == 0:
-            semantic_error("break statement outside while loop", getattr(node, 'lineno', None))
+            # change from "break statement outside while loop"
+            semantic_error("break must be inside 'while'", getattr(node, 'lineno', None))
 
     def n_exprStmt(self, node):
         # statement expressions can only be assignments or function calls
