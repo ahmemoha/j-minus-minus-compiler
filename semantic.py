@@ -144,20 +144,21 @@ class Pass2_LocalDecls(ASTTraversal):
         # entering a function: Open a new local scope
         self.symtab.open_scope()
         formals_node = node[2]
-        for formal in formals_node:
-            var_type = formal[0].attr
-            name = formal[1].attr
-            lineno = formal[1].lineno
+        # Only iterate if the formals node actually has children!
+        if hasattr(formals_node, 'children'):
+            for formal in formals_node:
+                var_type = formal[0].attr
+                name = formal[1].attr
+                lineno = formal[1].lineno
+                self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
 
-            self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
-
-            sig_type = 'bool' if var_type == 'boolean' else var_type
-            formal.sig = sig_type
-            formal[0].sig = sig_type
-            formal[1].sig = sig_type
-            # Attach the sym string to the identifier node
-            formal[1].sym = self.symtab.lookup(name)['sym_id']
-
+                sig_type = 'bool' if var_type == 'boolean' else var_type
+                formal.sym = self.symtab.lookup(name)['sym_id']
+                formal.sig = sig_type
+                formal[0].sig = sig_type
+                formal[1].sig = sig_type
+                # attach the sym string to the identifier node
+                formal[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_funcDecl_exit(self, node):
         # exiting a function: Close the local scope
@@ -167,17 +168,19 @@ class Pass2_LocalDecls(ASTTraversal):
     def n_mainDecl(self, node):
         self.symtab.open_scope()
         formals_node = node[2]
-        for formal in formals_node:
-            var_type = formal[0].attr
-            name = formal[1].attr
-            lineno = formal[1].lineno
-            self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
+        if hasattr(formals_node, 'children'):
+            for formal in formals_node:
+                var_type = formal[0].attr
+                name = formal[1].attr
+                lineno = formal[1].lineno
+                self.symtab.define(name, {'type': var_type, 'node': formal}, lineno)
 
-            sig_type = 'bool' if var_type == 'boolean' else var_type
-            formal.sig = sig_type
-            formal[0].sig = sig_type
-            formal[1].sig = sig_type
-            formal[1].sym = self.symtab.lookup(name)['sym_id']
+                sig_type = 'bool' if var_type == 'boolean' else var_type
+                formal.sym = self.symtab.lookup(name)['sym_id']
+                formal.sig = sig_type
+                formal[0].sig = sig_type
+                formal[1].sig = sig_type
+                formal[1].sym = self.symtab.lookup(name)['sym_id']
 
     def n_mainDecl_exit(self, node):
         self.symtab.close_scope()
