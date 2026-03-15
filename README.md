@@ -1,16 +1,16 @@
-# CPSC 411: Milestone 2: J-- Parser and AST Builder
+# CPSC 411: Milestone 3: J-- Semantic Analyzer
 
 ## Author
 Name: Ahmed Mohamed
 UCID: 30170510
 
 ## Description
-This project implements a syntax analyzer, the parser, and Abstract Syntax Tree (AST) builder for the J-- language, building upon the lexical analyzer from Milestone 1. It is written in Python 3 using ANTLR4 and Prof. Aycock's `cpsc411.astshaper` library 
+This project implements a Semantic Analyzer for the J-- language, building upon the parser and AST shaper from Milestone 2. It is written in Python 3 using the provided `cpsc411.asttraversal` library.
 
-It reads a J-- source file, parses the grammar, and outputs a formatted textual representation of the AST to standard output. Syntax errors are safely caught and reported to standard error with a nonzero exit code. A custom post processing pass is also included to properly fold negative constant numbers
+The compiler performs four distinct AST traversals, Pre/Post order and Post order, to build a multi level Scope Stack, Symbol Table, and perform table driven type checking. It catches distinct semantic errors (stuff like type mismatches, out of bounds integers, undefined identifiers, and invalid returns) and halts with formatted error messages. Valid ASTs are dedicated with type signatures, `sig`, and symbol table references,`sym`.
 
 ## Build Instructions
-Run `make` to generate the necessary ANTLR4 lexer and parser files. 
+Run `make` to generate the necessary ANTLR4 lexer and parser files 
 
 ## Usage
 python3 main.py <input_file>
