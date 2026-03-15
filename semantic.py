@@ -72,7 +72,6 @@ class Pass1_GlobalDecls(ASTTraversal):
         var_type = node[0].attr
         name = node[1].attr
         lineno = node[1].lineno
-
         self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
 
         # map boolean to bool for the sig output
@@ -81,10 +80,9 @@ class Pass1_GlobalDecls(ASTTraversal):
         # attach sym first, then sig
         # lookup the symbol we just defined to grab its sym_id
         node[1].sym = self.symtab.lookup(name)['sym_id']
-
         # add sig to the type and id nodes
-        node[0].sig = var_type
-        node[1].sig = var_type
+        node[0].sig = sig_type
+        node[1].sig = sig_type
 
     def n_funcDecl(self, node):
         # children: [type, id, formals, block]
@@ -432,7 +430,7 @@ class Pass4_MiscChecks(ASTTraversal):
         # check if 32 bit signed integer is out of bounds
         val = int(node.attr)
         if not (-2147483648 <= val <= 2147483647):
-            semantic_error("integer literal out of range", node.lineno)
+            semantic_error("number out of range", node.lineno)
 
 def check_semantics(ast):
     symtab = SymbolTable()
