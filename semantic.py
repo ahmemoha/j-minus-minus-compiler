@@ -214,10 +214,9 @@ class Pass2_LocalDecls(ASTTraversal):
         sym = self.symtab.lookup(name)
         if not sym:
             semantic_error(f"undeclared identifier '{name}'", node.lineno)
-        # instead of attaching the whole dictionary we just add the sig
-        node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
-        # for every usage of an ID attach its sym_id so it prints cleanly
+        # Attach sym first then sig to match reference compiler formatting
         node.sym = sym['sym_id']
+        node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
 
     def n_funcCall(self, node):
         # node[0] is the id node of the function being called
