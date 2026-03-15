@@ -409,8 +409,9 @@ class Pass4_MiscChecks(ASTTraversal):
     def n_exprStmt(self, node):
         # statement expressions can only be assignments or function calls
         child = node[0]
-        if child.type not in ('ASSIGN', 'funcCall'):
-            semantic_error("statement expression must be assignment or function invocation", getattr(child, 'lineno', getattr(node, 'lineno', None)))
+        f child.type not in ('ASSIGN', 'funcCall'):
+            # change from "statement expression must be assignment or function invocation"
+            semantic_error("must be assignment or function call", getattr(child, 'lineno', getattr(node, 'lineno', None)))
 
     def n_number(self, node):
         # check if 32 bit signed integer is out of bounds
