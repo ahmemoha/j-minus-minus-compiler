@@ -344,17 +344,6 @@ class Pass3_TypeCheck(ASTTraversal):
         rv_type = sym['rv']
         node.sig = 'bool' if rv_type == 'boolean' else rv_type
 
-    def n_id(self, node):
-        name = node.attr
-        sym = self.symtab.lookup(name)
-        if not sym:
-            semantic_error(f"undeclared identifier '{name}'", node.lineno)
-            node.sig = 'error'
-            return
-
-        # attach sym first, then sig
-        node.sym = sym['sym_id']
-        node.sig = 'bool' if sym['type'] == 'boolean' else sym['type']
 
 # miscellaneous checks
 class Pass4_MiscChecks(ASTTraversal):
