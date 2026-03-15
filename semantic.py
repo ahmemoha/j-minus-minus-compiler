@@ -75,6 +75,9 @@ class Pass1_GlobalDecls(ASTTraversal):
 
         self.symtab.define(name, {'type': var_type, 'node': node}, lineno)
 
+        # map boolean to bool for the sig output
+        sig_type = 'bool' if var_type == 'boolean' else var_type
+
         # attach sym first, then sig
         # lookup the symbol we just defined to grab its sym_id
         node[1].sym = self.symtab.lookup(name)['sym_id']
