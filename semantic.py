@@ -392,7 +392,7 @@ class Pass4_MiscChecks(ASTTraversal):
             else:
                 ret_type = getattr(node[0], 'sig', None)
                 if ret_type != self.current_return_type and ret_type != 'error':
-                    semantic_error("return value has wrong type", getattr(node, 'lineno', None))
+                    semantic_error("returned value has the wrong type", getattr(node, 'lineno', None))
 
     def n_whileStmt(self, node):
         self.while_depth += 1
