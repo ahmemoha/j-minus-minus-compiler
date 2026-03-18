@@ -8,7 +8,6 @@ from JminusParser import JminusParser
 from cpsc411.astshaper import ASTShaper
 from cpsc411.ast import AST
 from semantic import check_semantics
-import re
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
@@ -17,23 +16,6 @@ class FatalErrorListener(ErrorListener):
         # Milestone 2 spec: Error and warning messages should go to standard error. You should exit immediately after an error message.
         sys.stderr.write(f"error: {msg} at or near line {line}\n")
         sys.exit(1)
-
-# custom string class just above main()
-class SymString(str):
-    """ this tricks Python into printing sym7 instead of 'sym7'"""
-    def __repr__(self):
-        return self
-
-# inside main, right before you print the AST, iterate through it to wrap sym strings
-def fix_sym_quotes(node):
-    if not hasattr(node, 'type'):
-        return
-    if hasattr(node, 'sym') and isinstance(node.sym, str):
-        # wrap the sym_id in our custom string class so it prints without quotes
-        node.sym = SymString(node.sym)
-    for child in getattr(node, 'children', []):
-        fix_sym_quotes(child)
-
 
 def fold_uminus(node):
     # if it's not an AST node like a raw token, just return it
@@ -116,17 +98,8 @@ def main():
     # perform semantic checking, that would decorate the AST and catches errors
     ast = check_semantics(ast)
 
-    # fix the quote formatting right before printing
-    fix_sym_quotes(ast)
-
-    # convert the AST to a string then strip the quotes around sym='symX'
-    output = str(ast)
-
-    # this regex looks for sym='sym...' and replaces it with sym=sym
-    output = re.sub(r"sym='(sym\d+)'", r"sym=\1", output)
-
     # print the textual representation of the AST
-    print(output)
+    print(ast)
 
 if __name__ == '__main__':
     main()
