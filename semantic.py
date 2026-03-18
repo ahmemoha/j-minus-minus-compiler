@@ -1,6 +1,12 @@
 import sys
 from cpsc411.asttraversal import ASTTraversal
 
+
+class SymRef(str):
+    """a custom string class that strips quotes when printed via repr()"""
+    def __repr__(self):
+        return str(self)
+
 def semantic_error(msg, lineno=None):
     if lineno:
         sys.stderr.write(f"error: {msg} at or near line {lineno}\n")
@@ -32,7 +38,7 @@ class SymbolTable:
             ('halt', 'f()', 'void')
         ]
         for name, sig, rv in predefs:
-            sym_id = f"sym{self.next_sym_id}"
+            sym_id = SymRef(f"sym{self.next_sym_id}")
             self.next_sym_id += 1
             self.stack[0][name] = {'type': sig, 'rv': rv, 'sym_id': sym_id}
 
@@ -48,7 +54,7 @@ class SymbolTable:
             semantic_error(f"'{name}' redefined", lineno)
 
         # assign the next available sym_id to this newly defined variable/function
-        sym_id = f"sym{self.next_sym_id}"
+        sym_id = SymRef(f"sym{self.next_sym_id}")
         self.next_sym_id += 1
         attrs['sym_id'] = sym_id
         current_scope[name] = attrs
