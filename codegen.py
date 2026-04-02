@@ -108,6 +108,28 @@ class CodeGenerator(ASTTraversal):
         # attach the register to the node so the parent can consume it
         node.reg = reg
 
+    def n_funcCall(self, node):
+        func_sym = str(node[0].sym)
+        func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
+
+        # handle arguments, as in MS3, predefined functions take at most 1 argument
+        if len(node) > 1 and len(node[1].children) > 0:
+            arg_node = node[1].children[0]
+            arg_reg = getattr(arg_node, 'reg', None)
+            if arg_reg:
+                # move the argument into the $a0 register for the function call
+                self.emit(f"\tmove $a0,{arg_reg}")
+                # we consumed the argument, so free its register back to the pool
+                self.free_reg(arg_reg)
+
+        # call the function
+        self.emit(f"\tjal {func_label}")
+
+        # allocate a register for the returned value even if it's void, we keep it uniform
+        ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tmove {ret_reg},$v0")
+        node.reg = ret_reg
+
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
