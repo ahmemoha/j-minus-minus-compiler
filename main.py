@@ -7,7 +7,8 @@ from Jminus import Jminus
 from JminusParser import JminusParser
 from cpsc411.astshaper import ASTShaper
 from cpsc411.ast import AST
-from semantic import check_semantics
+from semantic import SymbolTable, Pass1_GlobalDecls, Pass2_LocalDecls, Pass3_TypeCheck, Pass4_MiscChecks
+from codegen import generate_code
 
 # updated error listener for Milestone 2
 # made a error listener to handle crashes or errors properly
@@ -40,6 +41,15 @@ def fold_uminus(node):
 
     return new_node
 
+
+def check_semantics(ast):
+    # modify check_semantics to return BOTH the ast and the symtab
+    symtab = SymbolTable()
+    Pass1_GlobalDecls(ast, symtab).postorder()
+    Pass2_LocalDecls(ast, symtab).preorder()
+    Pass3_TypeCheck(ast, symtab).postorder()
+    Pass4_MiscChecks(ast, symtab).preorder()
+    return ast, symtab
 
 
 def main():
@@ -95,11 +105,14 @@ def main():
     # fold the constant negative number
     ast = fold_uminus(ast)
 
-    # perform semantic checking, that would decorate the AST and catches errors
-    ast = check_semantics(ast)
+    # unpack the AST and Symtab
+    ast, symtab = check_semantics(ast)
 
-    # print the textual representation of the AST
-    print(ast)
+    # generate MIPS Assembly
+    mips_code = generate_code(ast, symtab)
+
+    # print the MIPS assembly instead of the AST
+    print(mips_code, end="")
 
 if __name__ == '__main__':
     main()
