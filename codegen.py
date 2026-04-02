@@ -50,9 +50,37 @@ class CodeGenerator(ASTTraversal):
         self.output.append(instr)
 
     def generate(self):
-        # traversal will fill self.output
-        self.postorder()
+        # global entry point for SPIM
+        self.emit("\t.text")
+        self.emit("\t.globl main")
+        self.emit("main:")
+
+        # mainDecl gets L0, so we jump there
+        self.emit("\tjal L0")
+        self.emit("\tj Lhalt")
+
+        # traverse the AST, the pre/post order supports entering and exiting nodes
+        self.preorder()
+
         return "\n".join(self.output) + "\n"
+
+    def n_mainDecl(self, node):
+        main_sym = str(node[1].sym)
+        main_label = self.get_new_label() # should be L0
+        self.sym_to_label[main_sym] = main_label
+
+        self.emit(f"{main_label}:")
+        # allocate stack space and save return address
+        self.emit("\tsubu $sp,$sp,4")
+        self.emit("\tsw $ra,0($sp)")
+
+    def n_mainDecl_exit(self, node):
+        exit_label = self.get_new_label()
+        self.emit(f"{exit_label}:")
+        # restore return address, deallocate stack, and return
+        self.emit("\tlw $ra,0($sp)")
+        self.emit("\taddu $sp,$sp,4")
+        self.emit("\tjr $ra")
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
