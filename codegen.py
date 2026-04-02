@@ -82,6 +82,33 @@ class CodeGenerator(ASTTraversal):
         self.emit("\taddu $sp,$sp,4")
         self.emit("\tjr $ra")
 
+
+    def n_string(self, node):
+        raw_str = node.attr
+        # evaluates safely handles escape characters like \n, \t
+        evaluated_str = eval(raw_str)
+        str_label = self.get_new_string_label()
+        length = len(evaluated_str)
+
+        # format the byte array for MIPS: .byte 72, 101, ...
+        byte_list = ", ".join(str(ord(c)) for c in evaluated_str)
+
+        self.emit("\t.data")
+        self.emit(f"{str_label}:")
+        self.emit(f"\t.word {length}")
+        if byte_list:
+            self.emit(f"\t.byte {byte_list}")
+        self.emit("\t.align 2")
+        self.emit("\t.text")
+
+        # allocate a register and load the address of the string into it
+        reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tla {reg},{str_label}")
+
+        # attach the register to the node so the parent can consume it
+        node.reg = reg
+
+
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
     return cg.generate()
