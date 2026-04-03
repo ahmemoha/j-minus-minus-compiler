@@ -89,12 +89,27 @@ class CodeGenerator(ASTTraversal):
         self.output.append(instr)
 
     def pre_pass(self):
-        # the global scope from MS3 is at index 1 of the symbol table stack
+        # 1. Find the main function's symbol ID directly from the AST!
+        main_sym_id = None
+        def find_main(n):
+            nonlocal main_sym_id
+            if hasattr(n, 'type') and n.type == 'mainDecl':
+                main_sym_id = str(n[1].sym)  # Grab the symbol of the main function
+            elif not isinstance(n, str):
+                try:
+                    for child in n:
+                        find_main(child)
+                except TypeError:
+                    pass
+                    
+        find_main(self.ast)
+
+        # 2. Iterate through the global scope and assign labels
         global_scope = self.symtab.stack[1]
         for name, attrs in global_scope.items():
             sym_id = str(attrs['sym_id'])
 
-            if name == 'main':
+            if sym_id == main_sym_id: # It's the entry point! (Even if it's named 'calculator')
                 lbl = self.get_new_label()
                 self.sym_to_label[sym_id] = lbl
                 self.main_label = lbl # save it for the SPIM entry point
