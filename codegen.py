@@ -68,24 +68,30 @@ class CodeGenerator(ASTTraversal):
         self.output.append(instr)
 
     def generate(self):
-        # global entry point for SPIM
-        self.emit("\t.text")
-        self.emit("\t.globl main")
-        self.emit("main:")
-
-        # mainDecl gets L0, so we jump there
-        self.emit("\tjal L0")
-        self.emit("\tj Lhalt")
-
-        # traverse the AST, the pre/post order supports entering and exiting nodes
+        # traverse the AST first
+        # this fills self.output and sets self.main_label
         self.preorder()
 
-        return "\n".join(self.output) + "\n"
+        # build the global entry point for SPIM using the dynamically found main_label
+        entry_code = [
+            "\t.text",
+            "\t.globl main",
+            "main:",
+            f"\tjal {self.main_label}",
+            "\tj Lhalt"
+        ]
+
+        # combine them
+        return "\n".join(entry_code + self.output) + "\n"
+
 
     def n_mainDecl(self, node):
         main_sym = str(node[1].sym)
         main_label = self.get_new_label() # should be L0
         self.sym_to_label[main_sym] = main_label
+
+        # save the main label so generate() can use it later
+        self.main_label = main_label
 
         # calculate stack frame size and save it on the node for the exit hook
         frame_size = self.setup_stack_frame(node)
