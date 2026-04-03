@@ -419,15 +419,18 @@ class CodeGenerator(ASTTraversal):
         node.reg = reg
 
     def n_literal(self, node):
-        # fallback just in case ASTShaper kept the 'literal' wrapper around the boolean
-        if len(node) > 0 and (node[0] == 'true' or getattr(node[0], 'type', '') == 'TRUE'):
-            reg = self.alloc_reg(getattr(node, 'lineno', None))
-            self.emit(f"\tli {reg},1")
-            node.reg = reg
-        elif len(node) > 0 and (node[0] == 'false' or getattr(node[0], 'type', '') == 'FALSE'):
-            reg = self.alloc_reg(getattr(node, 'lineno', None))
-            self.emit(f"\tli {reg},0")
-            node.reg = reg
+        if len(node) > 0:
+            # check if the child is 'true', 'false', or a TRUE/FALSE token
+            val = getattr(node[0], 'type', str(node[0]))
+            if val == 'true' or val == 'TRUE':
+                reg = self.alloc_reg(getattr(node, 'lineno', None))
+                self.emit(f"\tli {reg},1")
+                node.reg = reg
+            elif val == 'false' or val == 'FALSE':
+                reg = self.alloc_reg(getattr(node, 'lineno', None))
+                self.emit(f"\tli {reg},0")
+                node.reg = reg
+
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
