@@ -408,6 +408,19 @@ class CodeGenerator(ASTTraversal):
         # jump to the exit label of the function to clean up the stack
         self.emit(f"\tj {self.current_exit_label}")
 
+    def n_literal(self, node):
+        if len(node) > 0:
+            # check if the child is 'true', 'false', or a TRUE/FALSE token
+            val = getattr(node[0], 'type', str(node[0]))
+            if val in ('true', 'TRUE'):
+                reg = self.alloc_reg(getattr(node, 'lineno', None))
+                self.emit(f"\tli {reg},1")
+                node.reg = reg
+            elif val in ('false', 'FALSE'):
+                reg = self.alloc_reg(getattr(node, 'lineno', None))
+                self.emit(f"\tli {reg},0")
+                node.reg = reg
+
     def n_TRUE(self, node):
         reg = self.alloc_reg(getattr(node, 'lineno', None))
         self.emit(f"\tli {reg},1")
@@ -418,18 +431,6 @@ class CodeGenerator(ASTTraversal):
         self.emit(f"\tli {reg},0")
         node.reg = reg
 
-    def n_literal(self, node):
-        if len(node) > 0:
-            # check if the child is 'true', 'false', or a TRUE/FALSE token
-            val = getattr(node[0], 'type', str(node[0]))
-            if val == 'true' or val == 'TRUE':
-                reg = self.alloc_reg(getattr(node, 'lineno', None))
-                self.emit(f"\tli {reg},1")
-                node.reg = reg
-            elif val == 'false' or val == 'FALSE':
-                reg = self.alloc_reg(getattr(node, 'lineno', None))
-                self.emit(f"\tli {reg},0")
-                node.reg = reg
 
 
 def generate_code(ast, symtab):
