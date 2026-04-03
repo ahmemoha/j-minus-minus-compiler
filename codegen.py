@@ -10,7 +10,7 @@ class CodeGenerator(ASTTraversal):
         self.string_counter = 0
 
         # a simple pool of available MIPS registers
-        self.free_registers = [f"$t{i}" for i in range(10)] + [f"$s{i}" for i in range(8)]
+        self.free_registers = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
 
         # map our semantic 'sym' IDs to MIPS labels
         self.sym_to_label = {}
@@ -112,23 +112,35 @@ class CodeGenerator(ASTTraversal):
         func_sym = str(node[0].sym)
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
-        # handle arguments, node[1] is the actuals list, which is a list itself
+        # handle arguments as node[1] is the actuals list
         if len(node) > 1 and len(node[1]) > 0:
-            arg_node = node[1][0] 
+            arg_node = node[1][0]
             arg_reg = getattr(arg_node, 'reg', None)
             if arg_reg:
-                # move the argument into the $a0 register for the function call
                 self.emit(f"\tmove $a0,{arg_reg}")
-                # we consumed the argument, so free its register back to the pool
                 self.free_reg(arg_reg)
 
-        # call the function
         self.emit(f"\tjal {func_label}")
 
-        # allocate a register for the returned value even if it's void, we keep it uniform
-        ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
-        self.emit(f"\tmove {ret_reg},$v0")
-        node.reg = ret_reg
+        # only allocate a register if the function actually returns something!
+        if node.sig != 'void':
+            ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
+            self.emit(f"\tmove {ret_reg},$v0")
+            node.reg = ret_reg
+
+    def n_globVarDecl(self, node):
+        # node[0] is type, node[1] is id
+        var_sym = str(node[1].sym)
+
+        # create a unique global label like G_sym7
+        global_label = f"G_{var_sym}"
+        self.sym_to_label[var_sym] = global_label
+
+        # emit data segment for the global variable
+        self.emit("\t.data")
+        self.emit(f"{global_label}:")
+        self.emit("\t.word 0") # initialize with 0
+        self.emit("\t.text")
 
 
 def generate_code(ast, symtab):
