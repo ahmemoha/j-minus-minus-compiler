@@ -10,6 +10,7 @@ class CodeGenerator(ASTTraversal):
         self.label_counter = 0
         self.string_counter = 0
         self.global_counter = 0
+        self.loop_end_labels = []
 
         # a simple pool of available MIPS registers
         self.free_registers = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
@@ -191,6 +192,67 @@ class CodeGenerator(ASTTraversal):
         self.globals_output.append(f"{global_label}:")
         self.globals_output.append("\t.word 0")
         self.globals_output.append("\t.text")
+
+
+    # if statement
+    def n_ifStmt(self, node):
+        # we need a label to jump to if the condition is false
+        node.end_label = self.get_new_label()
+
+    def n_ifStmt_exit(self, node):
+        # emit the end label after the body of the if statement
+        self.emit(f"{node.end_label}:")
+
+    def n_ifElseStmt(self, node):
+        node.else_label = self.get_new_label()
+        node.end_label = self.get_new_label()
+
+    def n_ifElseStmt_exit(self, node):
+        self.emit(f"{node.end_label}:")
+
+    # while loop
+    def n_whileStmt(self, node):
+        node.start_label = self.get_new_label()
+        node.end_label = self.get_new_label()
+        self.loop_end_labels.append(node.end_label) # track for break statements
+        self.emit(f"{node.start_label}:")
+
+    def n_whileStmt_exit(self, node):
+        self.emit(f"\tj {node.start_label}") # jump back to the top
+        self.emit(f"{node.end_label}:")      # label to exit the loop
+        self.loop_end_labels.pop()
+
+    def n_breakStmt(self, node):
+        # jump to the end label of the innermost loop
+        if self.loop_end_labels:
+            self.emit(f"\tj {self.loop_end_labels[-1]}")
+
+    # for binary operators, we evaluate children, then combine them
+    def default_binary_op(self, node, mips_instr):
+        left_reg = node[0].reg
+        right_reg = node[1].reg
+        result_reg = self.alloc_reg(getattr(node, 'lineno', None))
+
+        # for ex. add $t0, $t1, $t2 or sge $t0, $t1, $t2
+        self.emit(f"\t{mips_instr} {result_reg},{left_reg},{right_reg}")
+        self.free_reg(left_reg)
+        self.free_reg(right_reg)
+        node.reg = result_reg
+
+    def n_ADD_exit(self, node): self.default_binary_op(node, "add")
+    def n_SUB_exit(self, node): self.default_binary_op(node, "sub")
+    def n_MUL_exit(self, node): self.default_binary_op(node, "mul")
+    def n_DIV_exit(self, node): self.default_binary_op(node, "div")
+    def n_MOD_exit(self, node): self.default_binary_op(node, "rem")
+
+    # comparisons evaluate to 1, true, or 0, false
+    def n_EQ_exit(self, node): self.default_binary_op(node, "seq")
+    def n_NE_exit(self, node): self.default_binary_op(node, "sne")
+    def n_LT_exit(self, node): self.default_binary_op(node, "slt")
+    def n_GT_exit(self, node): self.default_binary_op(node, "sgt")
+    def n_LE_exit(self, node): self.default_binary_op(node, "sle")
+    def n_GE_exit(self, node): self.default_binary_op(node, "sge")
+
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
