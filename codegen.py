@@ -41,20 +41,32 @@ class CodeGenerator(ASTTraversal):
 
     def setup_stack_frame(self, node):
         offset = 4 # 0($sp) is reserved for the return address ($ra)
-        # recursively search the function for variables
+        formals = [] # Keep track of parameters so we can save $a0, $a1, etc.
         def traverse(n):
             nonlocal offset
-            if hasattr(n, 'sym'):
-                sym_id = str(n.sym)
-                # if this symbol isn't mapped yet, not a global, not a function, it's a local/parameter!
-                if sym_id not in self.sym_to_label:
-                    self.sym_to_label[sym_id] = f"{offset}($sp)"
-                    offset += 4
+            if hasattr(n, 'type'):
+                # 1. If it's a PARAMETER: allocate space AND add to formals list
+                if n.type in ('formal', 'formalparameter'):
+                    var_sym = str(n[1].sym)
+                    if var_sym not in self.sym_to_label:
+                        self.sym_to_label[var_sym] = f"{offset}($sp)"
+                        offset += 4
+                        formals.append(var_sym)
+
+                # 2. If it's a LOCAL VARIABLE: allocate space ONLY
+                elif n.type == 'varDecl':
+                    var_sym = str(n[1].sym)
+                    if var_sym not in self.sym_to_label:
+                        self.sym_to_label[var_sym] = f"{offset}($sp)"
+                        offset += 4
+
+            # Keep traversing down the tree
             if hasattr(n, '__iter__') and not isinstance(n, str):
                 for child in n:
                     traverse(child)
+
         traverse(node)
-        return offset # this returns the total stack frame size needed
+        return offset, formals # Return both the size AND the parameter list!
 
     def get_new_label(self):
         lbl = f"L{self.label_counter}"
@@ -115,21 +127,21 @@ class CodeGenerator(ASTTraversal):
         super().preorder(node)
 
     def n_mainDecl(self, node):
-        # prevent the traversal from trying to "load" the function name
+        # Prevent the traversal from trying to "load" the function name
         node[1].is_decl = True
         main_sym = str(node[1].sym)
-        main_label = self.sym_to_label[main_sym] # get from pre-pass
+        main_label = self.sym_to_label[main_sym]
 
-        # calculate stack frame size and save it on the node for the exit hook
-        frame_size = self.setup_stack_frame(node)
+        # Calculate stack frame size and save it on the node for the exit hook
+        frame_size, formals = self.setup_stack_frame(node)
         node.frame_size = frame_size
 
-        # save the exit label so return statements know where to jump
+        # Save the exit label so return statements know where to jump
         self.current_exit_label = self.get_new_label()
-        node.exit_label = self.current_exit_label # save it for the exit hook
+        node.exit_label = self.current_exit_label
 
         self.emit(f"{main_label}:")
-        # allocate stack space and save return address
+        # Allocate stack space and save return address
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
         self.emit("\tsw $ra,0($sp)")
 
@@ -165,40 +177,24 @@ class CodeGenerator(ASTTraversal):
         node.reg = reg
 
     def n_funcDecl(self, node):
-        # prevent the traversal from trying to "load" the function name
-        node[1].is_decl = True
+        # Prevent the traversal from trying to "load" the function name
+        node[1].is_decl = True 
         func_sym = str(node[1].sym)
         func_label = self.sym_to_label[func_sym]
 
-        # calculate stack frame size and save it on the node
-        frame_size = self.setup_stack_frame(node)
+        # Calculate stack frame size and save it on the node
+        frame_size, formals = self.setup_stack_frame(node)
         node.frame_size = frame_size
 
-        # save the exit label so return statements know where to jump
+        # Save the exit label so return statements know where to jump
         self.current_exit_label = self.get_new_label()
-        node.exit_label = self.current_exit_label # save it for the exit hook
+        node.exit_label = self.current_exit_label
 
         self.emit(f"{func_label}:")
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
         self.emit("\tsw $ra,0($sp)")
 
-        # find all parameters, formals, and save incoming registers to their stack slots
-        formals = []
-        def find_formals(n):
-            if hasattr(n, 'type') and n.type == 'block':
-                return # stop searching, we hit the body
-            if hasattr(n, 'sym'):
-                sym_id = str(n.sym)
-                # if it's stored on the stack, it must be a parameter
-                if self.sym_to_label.get(sym_id, "").endswith("($sp)") and sym_id not in formals:
-                    formals.append(sym_id)
-            if hasattr(n, '__iter__') and not isinstance(n, str):
-                for child in n:
-                    find_formals(child)
-
-        find_formals(node)
-
-        # emit standard MIPS argument saves: sw $a0, 4($sp); sw $a1, 8($sp)
+        # Emit standard MIPS argument saves: sw $a0, 4($sp); sw $a1, 8($sp); etc.
         for i, sym in enumerate(formals):
             offset = self.sym_to_label.get(sym)
             if offset:
@@ -287,16 +283,18 @@ class CodeGenerator(ASTTraversal):
 
         var_sym = str(node.sym)
         location = self.sym_to_label.get(var_sym)
+
         # allocate a register and load the value from memory
         reg = self.alloc_reg(getattr(node, 'lineno', None))
-
+        # only load variables
+        # stack variables end in $sp, globals start with G
+        # this completely ignores function names which start with L
         if location and location.endswith("($sp)"):
             self.emit(f"\tlw {reg},{location}") # local variable on stack
-        elif location:
+        elif location and location.startswith("G"):
             self.emit(f"\tlw {reg},{location}") # global variable in .data
 
         node.reg = reg
-
     def n_ASSIGN_exit(self, node):
         # the right child has been evaluated into a register
         # store it
@@ -408,6 +406,15 @@ class CodeGenerator(ASTTraversal):
     def n_LE_exit(self, node): self.default_binary_op(node, "sle")
     def n_GE_exit(self, node): self.default_binary_op(node, "sge")
 
+    def n_AND_exit(self, node): self.default_binary_op(node, "and")
+    def n_OR_exit(self, node): self.default_binary_op(node, "or")
+    def n_NOT_exit(self, node):
+        # NOT just checks if the child evaluates to 0
+        child_reg = node[0].reg
+        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tseq {res_reg},{child_reg},0")
+        self.free_reg(child_reg)
+        node.reg = res_reg
 
     def n_returnStmt_exit(self, node):
         def get_reg(n):
