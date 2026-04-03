@@ -116,7 +116,7 @@ class CodeGenerator(ASTTraversal):
 
     def n_mainDecl(self, node):
         # prevent the traversal from trying to "load" the function name
-        node[1].prune = True
+        node[1].is_decl = True
         main_sym = str(node[1].sym)
         main_label = self.sym_to_label[main_sym] # get from pre-pass
 
@@ -166,7 +166,7 @@ class CodeGenerator(ASTTraversal):
 
     def n_funcDecl(self, node):
         # prevent the traversal from trying to "load" the function name
-        node[1].prune = True
+        node[1].is_decl = True
         func_sym = str(node[1].sym)
         func_label = self.sym_to_label[func_sym]
 
@@ -208,7 +208,7 @@ class CodeGenerator(ASTTraversal):
     def n_funcCall(self, node):
         # prune the function name of node[0] so the compiler
         # doesn't try to load the function as if it were a variable
-        node[0].prune = True
+        node[0].is_decl = True
 
     def n_funcCall_exit(self, node):
         func_sym = str(node[0].sym)
@@ -233,7 +233,7 @@ class CodeGenerator(ASTTraversal):
 
     def n_globVarDecl(self, node):
         # prevent the traversal from evaluating the global variable name
-        node.prune = True
+        node[1].is_decl = True
         # node[0] is type, node[1] is id
         var_sym = str(node[1].sym)
         global_label = self.sym_to_label[var_sym]
@@ -247,12 +247,12 @@ class CodeGenerator(ASTTraversal):
     def n_varDecl(self, node):
         # local variable declarations don't generate MIPS code
         # handled by the stack frame
-        node.prune = True
+        node[1].is_decl = True
 
     def n_formal(self, node):
         # parameters don't generate MIPS code
         # handled by the stack frame
-        node.prune = True
+        node[1].is_decl = True
 
     # variables, numbers and assignments
     def n_number(self, node):
@@ -267,8 +267,8 @@ class CodeGenerator(ASTTraversal):
         node[0].is_lvalue = True
 
     def n_id_exit(self, node):
-        # if this is the left side of an assignment, do nothing
-        if getattr(node, 'is_lvalue', False):
+        # if this is the left side of an assignment OR a declaration, do nothing!
+        if getattr(node, 'is_lvalue', False) or getattr(node, 'is_decl', False):
             return
 
         var_sym = str(node.sym)
