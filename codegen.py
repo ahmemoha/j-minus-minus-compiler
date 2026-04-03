@@ -219,11 +219,19 @@ class CodeGenerator(ASTTraversal):
         func_sym = str(node[0].sym)
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
-        # handle multiple arguments
+        # find the register buried in wrapper nodes
+        def get_reg(n):
+            if getattr(n, 'reg', None): return n.reg
+            if hasattr(n, '__iter__') and not isinstance(n, str):
+                for child in n:
+                    r = get_reg(child)
+                    if r: return r
+            return None
+
         if len(node) > 1:
             actuals = node[1]
             for i in range(len(actuals)):
-                arg_reg = getattr(actuals[i], 'reg', None)
+                arg_reg = get_reg(actuals[i])
                 if arg_reg:
                     self.emit(f"\tmove $a{i},{arg_reg}")
                     self.free_reg(arg_reg)
@@ -402,9 +410,17 @@ class CodeGenerator(ASTTraversal):
 
 
     def n_returnStmt_exit(self, node):
+        def get_reg(n):
+            if getattr(n, 'reg', None): return n.reg
+            if hasattr(n, '__iter__') and not isinstance(n, str):
+                for child in n:
+                    r = get_reg(child)
+                    if r: return r
+            return None
+
         # because this is an _exit hook, the child, the return value, is already evaluated
         if len(node) > 0:
-            ret_reg = getattr(node[0], 'reg', None)
+            ret_reg = get_reg(node[0])
             if ret_reg:
                 self.emit(f"\tmove $v0,{ret_reg}")
                 self.free_reg(ret_reg)
