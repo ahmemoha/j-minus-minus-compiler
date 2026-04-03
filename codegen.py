@@ -12,10 +12,12 @@ class CodeGenerator(ASTTraversal):
         self.global_counter = 0
         self.loop_end_labels = []
 
-        # a simple pool of available MIPS registers
-        self.free_registers = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
+        # LIFO pool: Popping from the end yields $s8, $s7... matching the reference!
+        self.free_registers = [f"$t{i}" for i in range(0, 10)] + [f"$s{i}" for i in range(0, 9)]
+        
+        # Explicit tracker for active registers
+        self.live_registers = [] 
 
-        # map our semantic 'sym' IDs to MIPS labels
         self.sym_to_label = {}
         self._init_predefined_labels()
 
@@ -32,45 +34,45 @@ class CodeGenerator(ASTTraversal):
         if not self.free_registers:
             sys.stderr.write(f"error: expression too complicated, ran out of registers at or near line {lineno}\n")
             sys.exit(1)
-        return self.free_registers.pop(0)
+            
+        reg = self.free_registers.pop() # LIFO pop for tight register reuse!
+        self.live_registers.append(reg) # Explicitly mark as active
+        return reg
 
     def free_reg(self, reg):
         if reg and reg not in self.free_registers:
-            # put the register back into the pool to be reused
-            self.free_registers.append(reg)
+            self.free_registers.append(reg) # Put back at the end of the stack
+            if reg in self.live_registers:
+                self.live_registers.remove(reg) # Explicitly mark as free
 
     def setup_stack_frame(self, node):
         offset = 4 # 0($sp) is reserved for the return address ($ra)
         formals = [] # keep track of parameters so we can save $a0, $a1, etc.
-        def traverse(n):
+        def find_symbols(n, is_param):
             nonlocal offset
-            if hasattr(n, 'type'):
-                # if it's a parameter -> allocate space AND add to formals list
-                if n.type in ('formal', 'formalparameter'):
-                    var_sym = str(n[1].sym)
-                    if var_sym not in self.sym_to_label:
-                        self.sym_to_label[var_sym] = f"{offset}($sp)"
-                        offset += 4
-                        formals.append(var_sym)
-
-                # if it's a local variable -> allocate space ONLY
-                elif n.type == 'varDecl':
-                    var_sym = str(n[1].sym)
-                    if var_sym not in self.sym_to_label:
-                        self.sym_to_label[var_sym] = f"{offset}($sp)"
-                        offset += 4
+            if hasattr(n, 'sym') and n.sym:
+                sym_str = str(n.sym)
+                if sym_str not in self.sym_to_label:
+                    self.sym_to_label[sym_str] = f"{offset}($sp)"
+                    offset += 4
+                    if is_param:
+                        formals.append(sym_str)
 
             # recursively check children without breaking on AST objects!
             if not isinstance(n, str):
                 try:
                     for child in n:
-                        traverse(child)
+                        find_symbols(child, is_param)
                 except TypeError:
                     pass
 
-        # scan the function for local variables
-        traverse(node)
-        return offset, formals # return both the size and the parameter list
+        # specifically scan node[2], the formals list first to map $a0, $a1
+        if len(node) > 2:
+            find_symbols(node[2], True)
+
+        # scan the rest of the function for local variables
+        find_symbols(node, False)
+        return offset, formals
 
 
     def get_new_label(self):
@@ -118,9 +120,65 @@ class CodeGenerator(ASTTraversal):
             "\tj Lhalt"
         ]
 
-        # combine them
-        return "\n".join(entry_code + self.globals_output + self.output) + "\n"
 
+        # runtime support (RTS) library
+        rts_code = [
+            "",
+            "# --- Runtime Support (RTS) ---",
+            "Lprints:",
+            "\tlw $t0, 0($a0)        # load string length",
+            "\taddu $t1, $a0, 4      # pointer to first char",
+            "Lprints_loop:",
+            "\tbeqz $t0, Lprints_done",
+            "\tlb $a0, 0($t1)        # load byte into $a0",
+            "\tli $v0, 11            # syscall 11: print char",
+            "\tsyscall",
+            "\taddu $t1, $t1, 1      # advance pointer",
+            "\tsubu $t0, $t0, 1      # decrement length",
+            "\tj Lprints_loop",
+            "Lprints_done:",
+            "\tjr $ra",
+            "",
+            "Lprinti:",
+            "\tli $v0, 1             # syscall 1: print int",
+            "\tsyscall",
+            "\tjr $ra",
+            "",
+            "Lprintb:",
+            "\tbnez $a0, Lprintb_true",
+            "\t.data",
+            "L_false_str: .asciiz \"false\"",
+            "\t.text",
+            "\tla $a0, L_false_str",
+            "\tli $v0, 4             # syscall 4: print string",
+            "\tsyscall",
+            "\tjr $ra",
+            "Lprintb_true:",
+            "\t.data",
+            "L_true_str: .asciiz \"true\"",
+            "\t.text",
+            "\tla $a0, L_true_str",
+            "\tli $v0, 4             # syscall 4: print string",
+            "\tsyscall",
+            "\tjr $ra",
+            "",
+            "Lprintc:",
+            "\tli $v0, 11            # syscall 11: print char",
+            "\tsyscall",
+            "\tjr $ra",
+            "",
+            "Lgetchar:",
+            "\tli $v0, 12            # syscall 12: read char",
+            "\tsyscall",
+            "\tjr $ra",
+            "",
+            "Lhalt:",
+            "\tli $v0, 10            # syscall 10: halt",
+            "\tsyscall"
+        ]
+
+        # combine them
+        return "\n".join(entry_code + self.globals_output + self.output + rts_code) + "\n"
 
     def preorder(self, node=None):
         if node is None:
@@ -220,7 +278,7 @@ class CodeGenerator(ASTTraversal):
         func_sym = str(node[0].sym)
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
-        # find the register buried in wrapper nodes
+        # Find the register buried in wrapper nodes
         def get_reg(n):
             if getattr(n, 'reg', None): return n.reg
             if not isinstance(n, str):
@@ -232,39 +290,40 @@ class CodeGenerator(ASTTraversal):
                     pass
             return None
 
-        # evaluate and load arguments
+        # 1. Evaluate and load arguments
         if len(node) > 1:
             actuals = node[1]
             for i in range(len(actuals)):
                 arg_reg = get_reg(actuals[i])
                 if arg_reg:
                     self.emit(f"\tmove $a{i},{arg_reg}")
-                    self.free_reg(arg_reg) # free it so it doesn't get pushed to the stack
+                    self.free_reg(arg_reg) # Free it so it doesn't get pushed to the stack!
 
-        # find all "in-use" registers and push them to the stack
-        all_regs = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
-        in_use = [r for r in all_regs if r not in self.free_registers]
-
-        if in_use:
+        # 2. Dynamic Caller-Save (ONLY FOR USER-DEFINED FUNCTIONS)
+        is_predefined = func_sym in ['sym1', 'sym2', 'sym3', 'sym4', 'sym5', 'sym6']
+        
+        # Use our bulletproof explicit tracker to grab active registers
+        in_use = [r for r in self.live_registers]
+        
+        if in_use and not is_predefined:
             self.emit(f"\tsubu $sp,$sp,{len(in_use) * 4}")
             for i, r in enumerate(in_use):
                 self.emit(f"\tsw {r},{i * 4}($sp)")
 
-        # jump to the function
+        # 3. Jump to the function!
         self.emit(f"\tjal {func_label}")
 
-        # pop all the registers back exactly as they were
-        if in_use:
+        # 4. Caller-Restore: Pop all the registers back exactly as they were
+        if in_use and not is_predefined:
             for i, r in enumerate(in_use):
                 self.emit(f"\tlw {r},{i * 4}($sp)")
             self.emit(f"\taddu $sp,$sp,{len(in_use) * 4}")
 
-        # capture the return value
+        # 5. Capture the return value
         if getattr(node, 'sig', None) != 'void':
             ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
             self.emit(f"\tmove {ret_reg},$v0")
             node.reg = ret_reg
-
 
     def n_globVarDecl(self, node):
         # prevent the traversal from evaluating the global variable name
@@ -418,8 +477,8 @@ class CodeGenerator(ASTTraversal):
         self.free_reg(right_reg)
         node.reg = result_reg
 
-    def n_ADD_exit(self, node): self.default_binary_op(node, "add")
-    def n_SUB_exit(self, node): self.default_binary_op(node, "sub")
+    def n_ADD_exit(self, node): self.default_binary_op(node, "addu")
+    def n_SUB_exit(self, node): self.default_binary_op(node, "subu")
     def n_MUL_exit(self, node): self.default_binary_op(node, "mul")
     def n_DIV_exit(self, node): self.default_binary_op(node, "div")
     def n_MOD_exit(self, node): self.default_binary_op(node, "rem")
@@ -432,69 +491,8 @@ class CodeGenerator(ASTTraversal):
     def n_LE_exit(self, node): self.default_binary_op(node, "sle")
     def n_GE_exit(self, node): self.default_binary_op(node, "sge")
 
-    def n_AND(self, node):
-        node.end_label = self.get_new_label()
-
-        # evaluate the left side
-        self.preorder(node[0])
-        left_reg = node[0].reg
-
-        # allocate a dedicated result register to match the reference compiler
-        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
-        self.emit(f"\tmove {res_reg},{left_reg}")
-        self.free_reg(left_reg)
-
-        # if left side is false (0), jump to the end, as the result stays 0
-        self.emit(f"\tbeqz {res_reg},{node.end_label}")
-
-        # otherwise, evaluate the right side
-        self.preorder(node[1])
-        right_reg = node[1].reg
-
-        # the result of the AND is whatever the right side evaluated to
-        self.emit(f"\tmove {res_reg},{right_reg}")
-        self.free_reg(right_reg)
-
-        # emit the end label and pass the result register up the tree
-        self.emit(f"{node.end_label}:")
-        node.reg = res_reg
-
-        # prune the children so the automatic traversal doesn't evaluate them a second time
-        node[0].prune = True
-        node[1].prune = True
-
-
-    def n_OR(self, node):
-        node.end_label = self.get_new_label()
-
-        # evaluate the left side
-        self.preorder(node[0])
-        left_reg = node[0].reg
-
-        # allocate a dedicated result register
-        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
-        self.emit(f"\tmove {res_reg},{left_reg}")
-        self.free_reg(left_reg)
-
-        # if left side is true (1), jump to the end, as the result stays 1
-        self.emit(f"\tbnez {res_reg},{node.end_label}")
-
-        # otherwise, evaluate the right side
-        self.preorder(node[1])
-        right_reg = node[1].reg
-
-        # the result of the OR is whatever the right side evaluated to
-        self.emit(f"\tmove {res_reg},{right_reg}")
-        self.free_reg(right_reg)
-
-        # emit the end label and pass the result register up the tree
-        self.emit(f"{node.end_label}:")
-        node.reg = res_reg
-
-        # prune the children so the automatic traversal doesn't evaluate them a second time
-        node[0].prune = True
-        node[1].prune = True
-
+    def n_AND_exit(self, node): self.default_binary_op(node, "and")
+    def n_OR_exit(self, node): self.default_binary_op(node, "or")
     def n_NOT_exit(self, node):
         # NOT just checks if the child evaluates to 0
         child_reg = node[0].reg
