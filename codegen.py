@@ -183,7 +183,8 @@ class CodeGenerator(ASTTraversal):
             "\tla $a0, L_div_zero_msg",
             "\tli $v0, 4             # syscall 4: print string",
             "\tsyscall",
-            "\tli $v0, 10            # exit",
+            "\tli $a0, 1             # Set the return code to 1!",
+            "\tli $v0, 17            # syscall 17: exit2 (exit with code)",
             "\tsyscall"
         ]
 
