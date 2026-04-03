@@ -6,6 +6,7 @@ class CodeGenerator(ASTTraversal):
         super().__init__(ast)
         self.symtab = symtab
         self.output = []
+        self.globals_output = []
         self.label_counter = 0
         self.string_counter = 0
         self.global_counter = 0
@@ -83,7 +84,7 @@ class CodeGenerator(ASTTraversal):
         ]
 
         # combine them
-        return "\n".join(entry_code + self.output) + "\n"
+        return "\n".join(entry_code + self.globals_output + self.output) + "\n"
 
 
     def n_mainDecl(self, node):
@@ -185,12 +186,11 @@ class CodeGenerator(ASTTraversal):
         self.global_counter += 1
         self.sym_to_label[var_sym] = global_label
 
-        # emit data segment for the global variable
-        self.emit("\t.data")
-        self.emit(f"{global_label}:")
-        self.emit("\t.word 0") # initialize with 0
-        self.emit("\t.text")
-
+        # send it to globals_output instead of standard output
+        self.globals_output.append("\t.data")
+        self.globals_output.append(f"{global_label}:")
+        self.globals_output.append("\t.word 0")
+        self.globals_output.append("\t.text")
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
