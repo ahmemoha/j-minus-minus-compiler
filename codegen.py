@@ -134,9 +134,7 @@ class CodeGenerator(ASTTraversal):
         self.emit("\tsw $ra,0($sp)")
 
     def n_mainDecl_exit(self, node):
-        exit_label = self.get_new_label()
-        self.emit(f"{exit_label}:")
-        # restore return address, deallocate stack, and return
+        self.emit(f"{node.exit_label}:") # use the saved label
         self.emit("\tlw $ra,0($sp)")
         self.emit(f"\taddu $sp,$sp,{node.frame_size}")
         self.emit("\tjr $ra")
@@ -185,8 +183,7 @@ class CodeGenerator(ASTTraversal):
         self.emit("\tsw $ra,0($sp)")
 
     def n_funcDecl_exit(self, node):
-        exit_label = self.get_new_label()
-        self.emit(f"{exit_label}:")
+        self.emit(f"{node.exit_label}:") # use the saved label
         self.emit("\tlw $ra,0($sp)")
         self.emit(f"\taddu $sp,$sp,{node.frame_size}")
         self.emit("\tjr $ra")
