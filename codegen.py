@@ -12,11 +12,11 @@ class CodeGenerator(ASTTraversal):
         self.global_counter = 0
         self.loop_end_labels = []
 
-        # LIFO pool: Popping from the end yields $s8, $s7... matching the reference!
+        # LIFO pool -> popping from the end yields $s8, $s7... matching the reference
         self.free_registers = [f"$t{i}" for i in range(0, 10)] + [f"$s{i}" for i in range(0, 9)]
-        
-        # Explicit tracker for active registers
-        self.live_registers = [] 
+
+        # explicit tracker for active registers
+        self.live_registers = []
 
         self.sym_to_label = {}
         self._init_predefined_labels()
@@ -34,16 +34,16 @@ class CodeGenerator(ASTTraversal):
         if not self.free_registers:
             sys.stderr.write(f"error: expression too complicated, ran out of registers at or near line {lineno}\n")
             sys.exit(1)
-            
-        reg = self.free_registers.pop() # LIFO pop for tight register reuse!
-        self.live_registers.append(reg) # Explicitly mark as active
+
+        reg = self.free_registers.pop() # LIFO pop for tight register reuse
+        self.live_registers.append(reg) # mark as active
         return reg
 
     def free_reg(self, reg):
         if reg and reg not in self.free_registers:
-            self.free_registers.append(reg) # Put back at the end of the stack
+            self.free_registers.append(reg) # put back at the end of the stack
             if reg in self.live_registers:
-                self.live_registers.remove(reg) # Explicitly mark as free
+                self.live_registers.remove(reg) # explicitly mark as free
 
     def setup_stack_frame(self, node):
         offset = 4 # 0($sp) is reserved for the return address ($ra)
@@ -174,6 +174,16 @@ class CodeGenerator(ASTTraversal):
             "",
             "Lhalt:",
             "\tli $v0, 10            # syscall 10: halt",
+            "\tsyscall",
+            "",
+            "L_div_zero_error:",
+            "\t.data",
+            "\tL_div_zero_msg: .asciiz \"error: division by zero\\n\"",
+            "\t.text",
+            "\tla $a0, L_div_zero_msg",
+            "\tli $v0, 4             # syscall 4: print string",
+            "\tsyscall",
+            "\tli $v0, 10            # exit",
             "\tsyscall"
         ]
 
@@ -278,7 +288,7 @@ class CodeGenerator(ASTTraversal):
         func_sym = str(node[0].sym)
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
-        # Find the register buried in wrapper nodes
+        # find the register buried in wrapper nodes
         def get_reg(n):
             if getattr(n, 'reg', None): return n.reg
             if not isinstance(n, str):
@@ -290,36 +300,36 @@ class CodeGenerator(ASTTraversal):
                     pass
             return None
 
-        # 1. Evaluate and load arguments
+        # evaluate and load arguments
         if len(node) > 1:
             actuals = node[1]
             for i in range(len(actuals)):
                 arg_reg = get_reg(actuals[i])
                 if arg_reg:
                     self.emit(f"\tmove $a{i},{arg_reg}")
-                    self.free_reg(arg_reg) # Free it so it doesn't get pushed to the stack!
+                    self.free_reg(arg_reg) # free it so it doesn't get pushed to the stack
 
-        # 2. Dynamic Caller-Save (ONLY FOR USER-DEFINED FUNCTIONS)
+        # dynamic caller save for only user defined function
         is_predefined = func_sym in ['sym1', 'sym2', 'sym3', 'sym4', 'sym5', 'sym6']
-        
-        # Use our bulletproof explicit tracker to grab active registers
+
+        # tracker to grab active registers
         in_use = [r for r in self.live_registers]
-        
+
         if in_use and not is_predefined:
             self.emit(f"\tsubu $sp,$sp,{len(in_use) * 4}")
             for i, r in enumerate(in_use):
                 self.emit(f"\tsw {r},{i * 4}($sp)")
 
-        # 3. Jump to the function!
+        # jump to the function
         self.emit(f"\tjal {func_label}")
 
-        # 4. Caller-Restore: Pop all the registers back exactly as they were
+        # pop all the registers back exactly as they were
         if in_use and not is_predefined:
             for i, r in enumerate(in_use):
                 self.emit(f"\tlw {r},{i * 4}($sp)")
             self.emit(f"\taddu $sp,$sp,{len(in_use) * 4}")
 
-        # 5. Capture the return value
+        # capture the return value
         if getattr(node, 'sig', None) != 'void':
             ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
             self.emit(f"\tmove {ret_reg},$v0")
@@ -480,8 +490,49 @@ class CodeGenerator(ASTTraversal):
     def n_ADD_exit(self, node): self.default_binary_op(node, "addu")
     def n_SUB_exit(self, node): self.default_binary_op(node, "subu")
     def n_MUL_exit(self, node): self.default_binary_op(node, "mul")
-    def n_DIV_exit(self, node): self.default_binary_op(node, "div")
-    def n_MOD_exit(self, node): self.default_binary_op(node, "rem")
+
+    def emit_div_mod_check(self, left_reg, right_reg):
+        ok_label = self.get_new_label()
+
+        # division by zero check that jumps to our RTS error block
+        self.emit(f"\tbeqz {right_reg}, L_div_zero_error")
+
+        # MIN_INT / -1 overflow Check
+        temp_reg = self.alloc_reg()
+        self.emit(f"\tli {temp_reg},-2147483648")
+        self.emit(f"\tbne {left_reg},{temp_reg},{ok_label}")
+        self.emit(f"\tli {temp_reg},-1")
+        self.emit(f"\tbne {right_reg},{temp_reg},{ok_label}")
+
+        # if we get here, it's MIN_INT / -1
+        # change divisor to 1 to bypass the hardware trap
+        self.emit(f"\tli {right_reg},1")
+        self.emit(f"{ok_label}:")
+        self.free_reg(temp_reg)
+
+    def n_DIV_exit(self, node):
+        left_reg = node[0].reg
+        right_reg = node[1].reg
+        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
+
+        self.emit_div_mod_check(left_reg, right_reg)
+        self.emit(f"\tdiv {res_reg},{left_reg},{right_reg}")
+
+        self.free_reg(left_reg)
+        self.free_reg(right_reg)
+        node.reg = res_reg
+
+    def n_MOD_exit(self, node):
+        left_reg = node[0].reg
+        right_reg = node[1].reg
+        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
+
+        self.emit_div_mod_check(left_reg, right_reg)
+        self.emit(f"\trem {res_reg},{left_reg},{right_reg}")
+
+        self.free_reg(left_reg)
+        self.free_reg(right_reg)
+        node.reg = res_reg
 
     # comparisons evaluate to 1, true, or 0, false
     def n_EQ_exit(self, node): self.default_binary_op(node, "seq")
