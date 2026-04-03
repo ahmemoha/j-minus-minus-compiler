@@ -108,13 +108,13 @@ class CodeGenerator(ASTTraversal):
         # attach the register to the node so the parent can consume it
         node.reg = reg
 
-    def n_funcCall(self, node):
+    def n_funcCall_exit(self, node):
         func_sym = str(node[0].sym)
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
-        # handle arguments, as in MS3, predefined functions take at most 1 argument
-        if len(node) > 1 and len(node[1].children) > 0:
-            arg_node = node[1].children[0]
+        # handle arguments, node[1] is the actuals list, which is a list itself
+        if len(node) > 1 and len(node[1]) > 0:
+            arg_node = node[1][0] 
             arg_reg = getattr(arg_node, 'reg', None)
             if arg_reg:
                 # move the argument into the $a0 register for the function call
