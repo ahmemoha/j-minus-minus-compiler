@@ -182,6 +182,23 @@ class CodeGenerator(ASTTraversal):
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
         self.emit("\tsw $ra,0($sp)")
 
+        # find all parameters, formals, and save incoming registers to their stack slots
+        formals = []
+        def find_formals(n):
+            if hasattr(n, 'type') and n.type == 'formal':
+                formals.append(str(n[1].sym))
+            elif hasattr(n, '__iter__') and not isinstance(n, str):
+                for child in n:
+                    find_formals(child)
+        find_formals(node)
+
+        # emit standard MIPS argument saves like sw $a0, 4($sp); sw $a1, 8($sp); etc.
+        for i, sym in enumerate(formals):
+            offset = self.sym_to_label.get(sym)
+            if offset:
+                self.emit(f"\tsw $a{i},{offset}")
+
+
     def n_funcDecl_exit(self, node):
         self.emit(f"{node.exit_label}:") # use the saved label
         self.emit("\tlw $ra,0($sp)")
