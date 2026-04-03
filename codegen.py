@@ -41,32 +41,33 @@ class CodeGenerator(ASTTraversal):
 
     def setup_stack_frame(self, node):
         offset = 4 # 0($sp) is reserved for the return address ($ra)
-        formals = [] # Keep track of parameters so we can save $a0, $a1, etc.
-        def traverse(n):
+        formals = [] # keep track of parameters so we can save $a0, $a1, etc.
+        def find_symbols(n, is_param):
             nonlocal offset
-            if hasattr(n, 'type'):
-                # 1. If it's a PARAMETER: allocate space AND add to formals list
-                if n.type in ('formal', 'formalparameter'):
-                    var_sym = str(n[1].sym)
-                    if var_sym not in self.sym_to_label:
-                        self.sym_to_label[var_sym] = f"{offset}($sp)"
-                        offset += 4
-                        formals.append(var_sym)
+            if hasattr(n, 'sym') and n.sym:
+                sym_str = str(n.sym)
+                if sym_str not in self.sym_to_label:
+                    self.sym_to_label[sym_str] = f"{offset}($sp)"
+                    offset += 4
+                    if is_param:
+                        formals.append(sym_str)
 
-                # 2. If it's a LOCAL VARIABLE: allocate space ONLY
-                elif n.type == 'varDecl':
-                    var_sym = str(n[1].sym)
-                    if var_sym not in self.sym_to_label:
-                        self.sym_to_label[var_sym] = f"{offset}($sp)"
-                        offset += 4
+            # recursively check children without breaking on AST objects!
+            if not isinstance(n, str):
+                try:
+                    for child in n:
+                        find_symbols(child, is_param)
+                except TypeError:
+                    pass
 
-            # Keep traversing down the tree
-            if hasattr(n, '__iter__') and not isinstance(n, str):
-                for child in n:
-                    traverse(child)
+        # specifically scan node[2], the formals list first to map $a0, $a1
+        if len(node) > 2:
+            find_symbols(node[2], True)
 
-        traverse(node)
-        return offset, formals # Return both the size AND the parameter list!
+        # scan the rest of the function for local variables
+        find_symbols(node, False)
+        return offset, formals
+
 
     def get_new_label(self):
         lbl = f"L{self.label_counter}"
@@ -127,21 +128,21 @@ class CodeGenerator(ASTTraversal):
         super().preorder(node)
 
     def n_mainDecl(self, node):
-        # Prevent the traversal from trying to "load" the function name
+        # prevent the traversal from trying to "load" the function name
         node[1].is_decl = True
         main_sym = str(node[1].sym)
         main_label = self.sym_to_label[main_sym]
 
-        # Calculate stack frame size and save it on the node for the exit hook
+        # calculate stack frame size and save it on the node for the exit hook
         frame_size, formals = self.setup_stack_frame(node)
         node.frame_size = frame_size
 
-        # Save the exit label so return statements know where to jump
+        # save the exit label so return statements know where to jump
         self.current_exit_label = self.get_new_label()
         node.exit_label = self.current_exit_label
 
         self.emit(f"{main_label}:")
-        # Allocate stack space and save return address
+        # allocate stack space and save return address
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
         self.emit("\tsw $ra,0($sp)")
 
@@ -177,16 +178,16 @@ class CodeGenerator(ASTTraversal):
         node.reg = reg
 
     def n_funcDecl(self, node):
-        # Prevent the traversal from trying to "load" the function name
-        node[1].is_decl = True 
+        # prevent the traversal from trying to "load" the function name
+        node[1].is_decl = True
         func_sym = str(node[1].sym)
         func_label = self.sym_to_label[func_sym]
 
-        # Calculate stack frame size and save it on the node
+        # calculate stack frame size and save it on the node
         frame_size, formals = self.setup_stack_frame(node)
         node.frame_size = frame_size
 
-        # Save the exit label so return statements know where to jump
+        # save the exit label so return statements know where to jump
         self.current_exit_label = self.get_new_label()
         node.exit_label = self.current_exit_label
 
@@ -194,7 +195,7 @@ class CodeGenerator(ASTTraversal):
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
         self.emit("\tsw $ra,0($sp)")
 
-        # Emit standard MIPS argument saves: sw $a0, 4($sp); sw $a1, 8($sp); etc.
+        # emit standard MIPS argument saves: sw $a0, 4($sp); sw $a1, 8($sp); etc.
         for i, sym in enumerate(formals):
             offset = self.sym_to_label.get(sym)
             if offset:
@@ -218,10 +219,13 @@ class CodeGenerator(ASTTraversal):
         # find the register buried in wrapper nodes
         def get_reg(n):
             if getattr(n, 'reg', None): return n.reg
-            if hasattr(n, '__iter__') and not isinstance(n, str):
-                for child in n:
-                    r = get_reg(child)
-                    if r: return r
+            if not isinstance(n, str):
+                try:
+                    for child in n:
+                        r = get_reg(child)
+                        if r: return r
+                except TypeError:
+                    pass
             return None
 
         if len(node) > 1:
@@ -295,6 +299,7 @@ class CodeGenerator(ASTTraversal):
             self.emit(f"\tlw {reg},{location}") # global variable in .data
 
         node.reg = reg
+
     def n_ASSIGN_exit(self, node):
         # the right child has been evaluated into a register
         # store it
@@ -419,10 +424,13 @@ class CodeGenerator(ASTTraversal):
     def n_returnStmt_exit(self, node):
         def get_reg(n):
             if getattr(n, 'reg', None): return n.reg
-            if hasattr(n, '__iter__') and not isinstance(n, str):
-                for child in n:
-                    r = get_reg(child)
-                    if r: return r
+            if not isinstance(n, str):
+                try:
+                    for child in n:
+                        r = get_reg(child)
+                        if r: return r
+                except TypeError:
+                    pass
             return None
 
         # because this is an _exit hook, the child, the return value, is already evaluated
