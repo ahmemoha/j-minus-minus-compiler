@@ -8,6 +8,7 @@ class CodeGenerator(ASTTraversal):
         self.output = []
         self.label_counter = 0
         self.string_counter = 0
+        self.global_counter = 0
 
         # a simple pool of available MIPS registers
         self.free_registers = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
@@ -179,8 +180,9 @@ class CodeGenerator(ASTTraversal):
         # node[0] is type, node[1] is id
         var_sym = str(node[1].sym)
 
-        # create a unique global label like G_sym7
-        global_label = f"G_{var_sym}"
+        # create a unique global label like G0, G1, etc.
+        global_label = f"G{self.global_counter}"
+        self.global_counter += 1
         self.sym_to_label[var_sym] = global_label
 
         # emit data segment for the global variable
