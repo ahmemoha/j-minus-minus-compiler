@@ -69,8 +69,31 @@ class CodeGenerator(ASTTraversal):
     def emit(self, instr):
         self.output.append(instr)
 
+    def pre_pass(self, node):
+        if hasattr(node, 'type'):
+            if node.type == 'globVarDecl':
+                var_sym = str(node[1].sym)
+                self.sym_to_label[var_sym] = f"G{self.global_counter}"
+                self.global_counter += 1
+            elif node.type == 'funcDecl':
+                func_sym = str(node[1].sym)
+                self.sym_to_label[func_sym] = self.get_new_label()
+            elif node.type == 'mainDecl':
+                main_sym = str(node[1].sym)
+                lbl = self.get_new_label()
+                self.sym_to_label[main_sym] = lbl
+                self.main_label = lbl # save it for the SPIM entry point
+
+        # recursively scan the whole tree
+        if hasattr(node, '__iter__') and not isinstance(node, str):
+            for child in node:
+                self.pre_pass(child)
+
     def generate(self):
-        # traverse the AST first
+        # do a pre-pass to find all globals and functions before code generation
+        self.pre_pass(self.ast)
+
+        # traverse the AST to generate code
         # this fills self.output and sets self.main_label
         self.preorder()
 
