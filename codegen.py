@@ -588,6 +588,19 @@ class CodeGenerator(ASTTraversal):
     def n_true_exit(self, node): self.n_TRUE_exit(node)
     def n_false_exit(self, node): self.n_FALSE_exit(node)
 
+    def n_exprStmt_exit(self, node):
+        # this is where standalone assignments and function calls go to die
+        # if they left a value in a register, we must free it so it doesn't leak
+        if getattr(node[0], 'reg', None):
+            self.free_reg(node[0].reg)
+
+    def n_UMINUS_exit(self, node):
+        # evaluates things like -F()
+        child_reg = node[0].reg
+        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tnegu {res_reg},{child_reg}")
+        self.free_reg(child_reg)
+        node.reg = res_reg
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
