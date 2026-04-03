@@ -242,13 +242,33 @@ class CodeGenerator(ASTTraversal):
 
     def n_string(self, node):
         raw_str = node.attr
-        # evaluates safely handles escape characters like \n, \t
-        evaluated_str = eval(raw_str)
+        inner_str = raw_str[1:-1] # Strip the outer double quotes
+        # manually parse escapes to completely avoid Python's eval() crashing on null bytes
+        evaluated_str = []
+        i = 0
+        while i < len(inner_str):
+            if inner_str[i] == '\\' and i + 1 < len(inner_str):
+                nxt = inner_str[i+1]
+                if nxt == 'n': evaluated_str.append(10)
+                elif nxt == 't': evaluated_str.append(9)
+                elif nxt == 'r': evaluated_str.append(13)
+                elif nxt == 'b': evaluated_str.append(8)
+                elif nxt == 'f': evaluated_str.append(12)
+                elif nxt == '\\': evaluated_str.append(92)
+                elif nxt == '"': evaluated_str.append(34)
+                elif nxt == "'": evaluated_str.append(39)
+                elif nxt == '0': evaluated_str.append(0)
+                else: evaluated_str.append(ord(nxt))
+                i += 2
+            else:
+                evaluated_str.append(ord(inner_str[i]))
+                i += 1
+
         str_label = self.get_new_string_label()
         length = len(evaluated_str)
 
         # format the byte array for MIPS: .byte 72, 101, ...
-        byte_list = ", ".join(str(ord(c)) for c in evaluated_str)
+        byte_list = ", ".join(str(b) for b in evaluated_str)
 
         self.emit("\t.data")
         self.emit(f"{str_label}:")
