@@ -185,12 +185,14 @@ class CodeGenerator(ASTTraversal):
         # find all parameters, formals, and save incoming registers to their stack slots
         formals = []
         def find_formals(n):
-            if hasattr(n, 'type') and n.type == 'formal':
+            if hasattr(n, 'type') and n.type in ('varDecl', 'formal', 'formalparameter'):
                 formals.append(str(n[1].sym))
             elif hasattr(n, '__iter__') and not isinstance(n, str):
                 for child in n:
                     find_formals(child)
-        find_formals(node)
+
+        if len(node) > 3:
+            find_formals(node[3])
 
         # emit standard MIPS argument saves like sw $a0, 4($sp); sw $a1, 8($sp); etc.
         for i, sym in enumerate(formals):
