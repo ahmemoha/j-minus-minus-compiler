@@ -89,27 +89,27 @@ class CodeGenerator(ASTTraversal):
         self.output.append(instr)
 
     def pre_pass(self):
-        # 1. Find the main function's symbol ID directly from the AST!
+        # find the main function's symbol ID directly from the AST!
         main_sym_id = None
         def find_main(n):
             nonlocal main_sym_id
             if hasattr(n, 'type') and n.type == 'mainDecl':
-                main_sym_id = str(n[1].sym)  # Grab the symbol of the main function
+                main_sym_id = str(n[1].sym)  # grab the symbol of the main function
             elif not isinstance(n, str):
                 try:
                     for child in n:
                         find_main(child)
                 except TypeError:
                     pass
-                    
+
         find_main(self.ast)
 
-        # 2. Iterate through the global scope and assign labels
+        # iterate through the global scope and assign labels
         global_scope = self.symtab.stack[1]
         for name, attrs in global_scope.items():
             sym_id = str(attrs['sym_id'])
 
-            if sym_id == main_sym_id: # It's the entry point! (Even if it's named 'calculator')
+            if sym_id == main_sym_id: # it's the entry point, even if it's named 'calculator'
                 lbl = self.get_new_label()
                 self.sym_to_label[sym_id] = lbl
                 self.main_label = lbl # save it for the SPIM entry point
@@ -185,6 +185,9 @@ class CodeGenerator(ASTTraversal):
             "Lgetchar:",
             "\tli $v0, 12            # syscall 12: read char",
             "\tsyscall",
+            "\tbnez $v0, Lgetchar_ok # if SPIM returned a valid char, we're good!",
+            "\tli $v0, -1            # if SPIM returned 0 (EOF), force it to be standard -1",
+            "Lgetchar_ok:",
             "\tjr $ra",
             "",
             "Lhalt:",
@@ -198,7 +201,7 @@ class CodeGenerator(ASTTraversal):
             "\tla $a0, L_div_zero_msg",
             "\tli $v0, 4             # syscall 4: print string",
             "\tsyscall",
-            "\tli $a0, 1             # Set the return code to 1!",
+            "\tli $a0, 1             # set the return code to 1!",
             "\tli $v0, 17            # syscall 17: exit2 (exit with code)",
             "\tsyscall"
         ]
