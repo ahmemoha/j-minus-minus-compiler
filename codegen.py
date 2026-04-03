@@ -45,7 +45,7 @@ class CodeGenerator(ASTTraversal):
         def traverse(n):
             nonlocal offset
             if hasattr(n, 'type'):
-                if n.type in ('varDecl', 'formal'):
+                if n.type in ('varDecl', 'formal', 'formalparameter'):
                     # n[1] is the identifier node. Map it to the stack offset
                     var_sym = str(n[1].sym)
                     self.sym_to_label[var_sym] = f"{offset}($sp)"
