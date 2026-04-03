@@ -398,20 +398,6 @@ class CodeGenerator(ASTTraversal):
     def n_GE_exit(self, node): self.default_binary_op(node, "sge")
 
 
-    def n_returnStmt(self, node):
-        # if there is a return value not a void return
-        if len(node) > 0:
-            self.preorder(node[0]) # evaluate the expression
-            ret_reg = node[0].reg
-
-            # move the result into the standard $v0 return register
-            self.emit(f"\tmove $v0,{ret_reg}")
-            self.free_reg(ret_reg)
-            node[0].prune = True
-
-        # jump to the end of the function to clean up the stack
-        self.emit(f"\tj {self.current_exit_label}")
-
     def n_returnStmt_exit(self, node):
         # because this is an _exit hook, the child, the return value, is already evaluated
         if len(node) > 0:
