@@ -197,21 +197,22 @@ class CodeGenerator(ASTTraversal):
         func_sym = str(node[0].sym)
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
-        # handle arguments as node[1] is the actuals list
-        if len(node) > 1 and len(node[1]) > 0:
-            arg_node = node[1][0]
-            arg_reg = getattr(arg_node, 'reg', None)
-            if arg_reg:
-                self.emit(f"\tmove $a0,{arg_reg}")
-                self.free_reg(arg_reg)
+        # handle multiple arguments
+        if len(node) > 1 and hasattr(node[1], '__iter__'):
+            for i, arg_node in enumerate(node[1]):
+                arg_reg = getattr(arg_node, 'reg', None)
+                if arg_reg:
+                    self.emit(f"\tmove $a{i},{arg_reg}")
+                    self.free_reg(arg_reg)
 
         self.emit(f"\tjal {func_label}")
 
-        # only allocate a register if the function actually returns something!
-        if node.sig != 'void':
+        # only allocate a register if the function actually returns something
+        if getattr(node, 'sig', None) != 'void':
             ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
             self.emit(f"\tmove {ret_reg},$v0")
             node.reg = ret_reg
+
 
     def n_globVarDecl(self, node):
         # prevent the traversal from evaluating the global variable name
