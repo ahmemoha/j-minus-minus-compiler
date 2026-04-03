@@ -232,17 +232,34 @@ class CodeGenerator(ASTTraversal):
                     pass
             return None
 
+        # evaluate and load arguments
         if len(node) > 1:
             actuals = node[1]
             for i in range(len(actuals)):
                 arg_reg = get_reg(actuals[i])
                 if arg_reg:
                     self.emit(f"\tmove $a{i},{arg_reg}")
-                    self.free_reg(arg_reg)
+                    self.free_reg(arg_reg) # free it so it doesn't get pushed to the stack
 
+        # find all "in-use" registers and push them to the stack
+        all_regs = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
+        in_use = [r for r in all_regs if r not in self.free_registers]
+
+        if in_use:
+            self.emit(f"\tsubu $sp,$sp,{len(in_use) * 4}")
+            for i, r in enumerate(in_use):
+                self.emit(f"\tsw {r},{i * 4}($sp)")
+
+        # jump to the function
         self.emit(f"\tjal {func_label}")
 
-        # only allocate a register if the function actually returns something
+        # pop all the registers back exactly as they were
+        if in_use:
+            for i, r in enumerate(in_use):
+                self.emit(f"\tlw {r},{i * 4}($sp)")
+            self.emit(f"\taddu $sp,$sp,{len(in_use) * 4}")
+
+        # capture the return value
         if getattr(node, 'sig', None) != 'void':
             ret_reg = self.alloc_reg(getattr(node, 'lineno', None))
             self.emit(f"\tmove {ret_reg},$v0")
