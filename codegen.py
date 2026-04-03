@@ -56,7 +56,6 @@ class CodeGenerator(ASTTraversal):
         traverse(node)
         return offset # this returns the total stack frame size needed
 
-
     def get_new_label(self):
         lbl = f"L{self.label_counter}"
         self.label_counter += 1
@@ -87,6 +86,14 @@ class CodeGenerator(ASTTraversal):
         # combine them
         return "\n".join(entry_code + self.globals_output + self.output) + "\n"
 
+    def preorder(self, node=None):
+        if node is None:
+            node = self.ast
+        # if we flagged this node to be skipped (pruned), stop traversing it!
+        if getattr(node, 'prune', False):
+            return
+        # otherwise, pass it up to the original ASTTraversal library to do its normal job
+        super().preorder(node)
 
     def n_mainDecl(self, node):
         main_sym = str(node[1].sym)
@@ -194,10 +201,66 @@ class CodeGenerator(ASTTraversal):
         self.globals_output.append("\t.text")
 
 
+
+    # variables, numbers and assignments
+    def n_number(self, node):
+        # allocate a register and load the immediate number into it
+        reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tli {reg},{node.attr}")
+        node.reg = reg
+
+    def n_ASSIGN(self, node):
+        # tell the left child, the variable, not to load its value into a register
+        # because we are about to overwrite it
+        node[0].is_lvalue = True
+
+    def n_id_exit(self, node):
+        # if this is the left side of an assignment, do nothing
+        if getattr(node, 'is_lvalue', False):
+            return
+
+        var_sym = str(node.sym)
+        location = self.sym_to_label.get(var_sym)
+        # allocate a register and load the value from memory
+        reg = self.alloc_reg(getattr(node, 'lineno', None))
+
+        if location and location.endswith("($sp)"):
+            self.emit(f"\tlw {reg},{location}") # local variable on stack
+        elif location:
+            self.emit(f"\tlw {reg},{location}") # global variable in .data
+
+        node.reg = reg
+
+    def n_ASSIGN_exit(self, node):
+        # the right child has been evaluated into a register
+        # store it
+        var_sym = str(node[0].sym)
+        location = self.sym_to_label.get(var_sym)
+        rhs_reg = node[1].reg
+
+        if location and location.endswith("($sp)"):
+            self.emit(f"\tsw {rhs_reg},{location}")
+        elif location:
+            self.emit(f"\tsw {rhs_reg},{location}")
+
+        # an assignment evaluates to its right hand side, so pass the register up
+        node.reg = rhs_reg
+
     # if statement
     def n_ifStmt(self, node):
-        # we need a label to jump to if the condition is false
         node.end_label = self.get_new_label()
+
+        # manually evaluate the condition (node[0])
+        self.preorder(node[0])
+        cond_reg = node[0].reg
+
+        # emit the branch instruction! If false (0), jump to end_label
+        self.emit(f"\tbeqz {cond_reg},{node.end_label}")
+        self.free_reg(cond_reg)
+
+        # prune the condition so the automatic traversal doesn't run it again
+        node[0].prune = True
+
 
     def n_ifStmt_exit(self, node):
         # emit the end label after the body of the if statement
@@ -206,6 +269,22 @@ class CodeGenerator(ASTTraversal):
     def n_ifElseStmt(self, node):
         node.else_label = self.get_new_label()
         node.end_label = self.get_new_label()
+
+        # manually evaluate the condition
+        self.preorder(node[0])
+        cond_reg = node[0].reg
+        # branch to else_label if false
+        self.emit(f"\tbeqz {cond_reg},{node.else_label}")
+        self.free_reg(cond_reg)
+        node[0].prune = True
+
+        # manually evaluate the IF block (node[1])
+        self.preorder(node[1])
+
+        # jump over the ELSE block
+        self.emit(f"\tj {node.end_label}")
+        self.emit(f"{node.else_label}:")
+        node[1].prune = True # prune the IF block so the automatic traversal just runs the ELSE block
 
     def n_ifElseStmt_exit(self, node):
         self.emit(f"{node.end_label}:")
@@ -216,6 +295,16 @@ class CodeGenerator(ASTTraversal):
         node.end_label = self.get_new_label()
         self.loop_end_labels.append(node.end_label) # track for break statements
         self.emit(f"{node.start_label}:")
+
+        # manually evaluate condition
+        self.preorder(node[0])
+        cond_reg = node[0].reg
+
+        # branch to exit if false
+        self.emit(f"\tbeqz {cond_reg},{node.end_label}")
+        self.free_reg(cond_reg)
+        node[0].prune = True
+
 
     def n_whileStmt_exit(self, node):
         self.emit(f"\tj {node.start_label}") # jump back to the top
