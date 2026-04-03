@@ -115,6 +115,8 @@ class CodeGenerator(ASTTraversal):
         super().preorder(node)
 
     def n_mainDecl(self, node):
+        # prevent the traversal from trying to "load" the function name
+        node[1].prune = True
         main_sym = str(node[1].sym)
         main_label = self.sym_to_label[main_sym] # get from pre-pass
 
@@ -161,6 +163,8 @@ class CodeGenerator(ASTTraversal):
         node.reg = reg
 
     def n_funcDecl(self, node):
+        # prevent the traversal from trying to "load" the function name
+        node[1].prune = True
         func_sym = str(node[1].sym)
         func_label = self.sym_to_label[func_sym]
 
@@ -205,6 +209,8 @@ class CodeGenerator(ASTTraversal):
             node.reg = ret_reg
 
     def n_globVarDecl(self, node):
+        # prevent the traversal from evaluating the global variable name
+        node.prune = True
         # node[0] is type, node[1] is id
         var_sym = str(node[1].sym)
         global_label = self.sym_to_label[var_sym]
@@ -215,7 +221,15 @@ class CodeGenerator(ASTTraversal):
         self.globals_output.append("\t.word 0")
         self.globals_output.append("\t.text")
 
+    def n_varDecl(self, node):
+        # local variable declarations don't generate MIPS code
+        # handled by the stack frame
+        node.prune = True
 
+    def n_formal(self, node):
+        # parameters don't generate MIPS code
+        # handled by the stack frame
+        node.prune = True
 
     # variables, numbers and assignments
     def n_number(self, node):
