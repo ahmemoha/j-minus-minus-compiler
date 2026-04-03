@@ -36,6 +36,24 @@ class CodeGenerator(ASTTraversal):
             # put the register back into the pool to be reused
             self.free_registers.append(reg)
 
+    def setup_stack_frame(self, node):
+        offset = 4 # 0($sp) is reserved for the return address ($ra)
+        # recursively search the function for variables
+        def traverse(n):
+            nonlocal offset
+            if hasattr(n, 'type'):
+                if n.type in ('varDecl', 'formal'):
+                    # n[1] is the identifier node. Map it to the stack offset
+                    var_sym = str(n[1].sym)
+                    self.sym_to_label[var_sym] = f"{offset}($sp)"
+                    offset += 4
+                for child in n:
+                    traverse(child)
+
+        traverse(node)
+        return offset # this returns the total stack frame size needed
+
+
     def get_new_label(self):
         lbl = f"L{self.label_counter}"
         self.label_counter += 1
@@ -69,9 +87,13 @@ class CodeGenerator(ASTTraversal):
         main_label = self.get_new_label() # should be L0
         self.sym_to_label[main_sym] = main_label
 
+        # calculate stack frame size and save it on the node for the exit hook
+        frame_size = self.setup_stack_frame(node)
+        node.frame_size = frame_size
+
         self.emit(f"{main_label}:")
         # allocate stack space and save return address
-        self.emit("\tsubu $sp,$sp,4")
+        self.emit(f"\tsubu $sp,$sp,{frame_size}")
         self.emit("\tsw $ra,0($sp)")
 
     def n_mainDecl_exit(self, node):
@@ -79,9 +101,8 @@ class CodeGenerator(ASTTraversal):
         self.emit(f"{exit_label}:")
         # restore return address, deallocate stack, and return
         self.emit("\tlw $ra,0($sp)")
-        self.emit("\taddu $sp,$sp,4")
+        self.emit(f"\taddu $sp,$sp,{node.frame_size}")
         self.emit("\tjr $ra")
-
 
     def n_string(self, node):
         raw_str = node.attr
@@ -107,6 +128,26 @@ class CodeGenerator(ASTTraversal):
 
         # attach the register to the node so the parent can consume it
         node.reg = reg
+
+    def n_funcDecl(self, node):
+        func_sym = str(node[1].sym)
+        func_label = self.get_new_label()
+        self.sym_to_label[func_sym] = func_label
+
+        # calculate stack frame size and save it on the node
+        frame_size = self.setup_stack_frame(node)
+        node.frame_size = frame_size
+
+        self.emit(f"{func_label}:")
+        self.emit(f"\tsubu $sp,$sp,{frame_size}")
+        self.emit("\tsw $ra,0($sp)")
+
+    def n_funcDecl_exit(self, node):
+        exit_label = self.get_new_label()
+        self.emit(f"{exit_label}:")
+        self.emit("\tlw $ra,0($sp)")
+        self.emit(f"\taddu $sp,$sp,{node.frame_size}")
+        self.emit("\tjr $ra")
 
     def n_funcCall_exit(self, node):
         func_sym = str(node[0].sym)
