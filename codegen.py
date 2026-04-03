@@ -45,7 +45,7 @@ class CodeGenerator(ASTTraversal):
         def traverse(n):
             nonlocal offset
             if hasattr(n, 'type'):
-                if n.type in ('varDecl', 'formal', 'formalparameter'):
+                if n.type in ('varDecl', 'formal', 'formalparameter') or 'Decl' in n.type:
                     # n[1] is the identifier node. Map it to the stack offset
                     var_sym = str(n[1].sym)
                     self.sym_to_label[var_sym] = f"{offset}($sp)"
@@ -191,7 +191,10 @@ class CodeGenerator(ASTTraversal):
                 for child in n:
                     find_formals(child)
 
-        find_formals(node)
+        # search the signature area, usually node[2] or node[3], for parameters
+        for child in node[2:]:
+            if hasattr(child, 'type') and child.type != 'block':
+                find_formals(child)
 
         # emit standard MIPS argument saves like sw $a0, 4($sp); sw $a1, 8($sp); etc.
         for i, sym in enumerate(formals):
