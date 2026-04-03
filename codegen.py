@@ -391,6 +391,17 @@ class CodeGenerator(ASTTraversal):
         # jump to the end of the function to clean up the stack
         self.emit(f"\tj {self.current_exit_label}")
 
+    def n_TRUE(self, node):
+        reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tli {reg},1")
+        node.reg = reg
+
+    def n_FALSE(self, node):
+        reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tli {reg},0")
+        node.reg = reg
+
+
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
     return cg.generate()
