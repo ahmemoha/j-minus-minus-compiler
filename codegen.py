@@ -69,32 +69,27 @@ class CodeGenerator(ASTTraversal):
     def emit(self, instr):
         self.output.append(instr)
 
-    def pre_pass(self, node):
-        if hasattr(node, 'type'):
-            if node.type == 'globVarDecl':
-                var_sym = str(node[1].sym)
-                self.sym_to_label[var_sym] = f"G{self.global_counter}"
-                self.global_counter += 1
-            elif node.type == 'funcDecl':
-                func_sym = str(node[1].sym)
-                self.sym_to_label[func_sym] = self.get_new_label()
-            elif node.type == 'mainDecl':
-                main_sym = str(node[1].sym)
-                lbl = self.get_new_label()
-                self.sym_to_label[main_sym] = lbl
-                self.main_label = lbl # save it for the SPIM entry point
+    def pre_pass(self):
+        # the global scope from MS3 is at index 1 of the symbol table stack
+        global_scope = self.symtab.stack[1]
+        for name, attrs in global_scope.items():
+            sym_id = str(attrs['sym_id'])
 
-        # recursively scan the whole tree
-        if hasattr(node, '__iter__') and not isinstance(node, str):
-            for child in node:
-                self.pre_pass(child)
+            if name == 'main':
+                lbl = self.get_new_label()
+                self.sym_to_label[sym_id] = lbl
+                self.main_label = lbl # save it for the SPIM entry point
+            elif 'f(' in attrs['type']: # it's a regular function
+                self.sym_to_label[sym_id] = self.get_new_label()
+            else: # it's a global variable
+                self.sym_to_label[sym_id] = f"G{self.global_counter}"
+                self.global_counter += 1
 
     def generate(self):
-        # do a pre-pass to find all globals and functions before code generation
-        self.pre_pass(self.ast)
+        # pre pass, this finds all globals and functions
+        self.pre_pass()
 
         # traverse the AST to generate code
-        # this fills self.output and sets self.main_label
         self.preorder()
 
         # build the global entry point for SPIM using the dynamically found main_label
@@ -109,6 +104,7 @@ class CodeGenerator(ASTTraversal):
         # combine them
         return "\n".join(entry_code + self.globals_output + self.output) + "\n"
 
+
     def preorder(self, node=None):
         if node is None:
             node = self.ast
@@ -120,11 +116,7 @@ class CodeGenerator(ASTTraversal):
 
     def n_mainDecl(self, node):
         main_sym = str(node[1].sym)
-        main_label = self.get_new_label() # should be L0
-        self.sym_to_label[main_sym] = main_label
-
-        # save the main label so generate() can use it later
-        self.main_label = main_label
+        main_label = self.sym_to_label[main_sym] # get from pre-pass
 
         # calculate stack frame size and save it on the node for the exit hook
         frame_size = self.setup_stack_frame(node)
@@ -170,8 +162,7 @@ class CodeGenerator(ASTTraversal):
 
     def n_funcDecl(self, node):
         func_sym = str(node[1].sym)
-        func_label = self.get_new_label()
-        self.sym_to_label[func_sym] = func_label
+        func_label = self.sym_to_label[func_sym]
 
         # calculate stack frame size and save it on the node
         frame_size = self.setup_stack_frame(node)
@@ -187,6 +178,11 @@ class CodeGenerator(ASTTraversal):
         self.emit("\tlw $ra,0($sp)")
         self.emit(f"\taddu $sp,$sp,{node.frame_size}")
         self.emit("\tjr $ra")
+
+    def n_funcCall(self, node):
+        # prune the function name of node[0] so the compiler
+        # doesn't try to load the function as if it were a variable
+        node[0].prune = True
 
     def n_funcCall_exit(self, node):
         func_sym = str(node[0].sym)
@@ -211,11 +207,7 @@ class CodeGenerator(ASTTraversal):
     def n_globVarDecl(self, node):
         # node[0] is type, node[1] is id
         var_sym = str(node[1].sym)
-
-        # create a unique global label like G0, G1, etc.
-        global_label = f"G{self.global_counter}"
-        self.global_counter += 1
-        self.sym_to_label[var_sym] = global_label
+        global_label = self.sym_to_label[var_sym]
 
         # send it to globals_output instead of standard output
         self.globals_output.append("\t.data")
