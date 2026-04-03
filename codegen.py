@@ -215,9 +215,10 @@ class CodeGenerator(ASTTraversal):
         func_label = self.sym_to_label.get(func_sym, "UNKNOWN_FUNC")
 
         # handle multiple arguments
-        if len(node) > 1 and hasattr(node[1], '__iter__'):
-            for i, arg_node in enumerate(node[1]):
-                arg_reg = getattr(arg_node, 'reg', None)
+        if len(node) > 1:
+            actuals = node[1]
+            for i in range(len(actuals)):
+                arg_reg = getattr(actuals[i], 'reg', None)
                 if arg_reg:
                     self.emit(f"\tmove $a{i},{arg_reg}")
                     self.free_reg(arg_reg)
@@ -409,6 +410,17 @@ class CodeGenerator(ASTTraversal):
         # jump to the end of the function to clean up the stack
         self.emit(f"\tj {self.current_exit_label}")
 
+    def n_returnStmt_exit(self, node):
+        # because this is an _exit hook, the child, the return value, is already evaluated
+        if len(node) > 0:
+            ret_reg = getattr(node[0], 'reg', None)
+            if ret_reg:
+                self.emit(f"\tmove $v0,{ret_reg}")
+                self.free_reg(ret_reg)
+
+        # jump to the exit label of the function to clean up the stack
+        self.emit(f"\tj {self.current_exit_label}")
+
     def n_TRUE(self, node):
         reg = self.alloc_reg(getattr(node, 'lineno', None))
         self.emit(f"\tli {reg},1")
@@ -419,6 +431,16 @@ class CodeGenerator(ASTTraversal):
         self.emit(f"\tli {reg},0")
         node.reg = reg
 
+    def n_literal(self, node):
+        # fallback just in case ASTShaper kept the 'literal' wrapper around the boolean
+        if len(node) > 0 and (node[0] == 'true' or getattr(node[0], 'type', '') == 'TRUE'):
+            reg = self.alloc_reg(getattr(node, 'lineno', None))
+            self.emit(f"\tli {reg},1")
+            node.reg = reg
+        elif len(node) > 0 and (node[0] == 'false' or getattr(node[0], 'type', '') == 'FALSE'):
+            reg = self.alloc_reg(getattr(node, 'lineno', None))
+            self.emit(f"\tli {reg},0")
+            node.reg = reg
 
 def generate_code(ast, symtab):
     cg = CodeGenerator(ast, symtab)
