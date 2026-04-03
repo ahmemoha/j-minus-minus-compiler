@@ -44,15 +44,15 @@ class CodeGenerator(ASTTraversal):
         # recursively search the function for variables
         def traverse(n):
             nonlocal offset
-            if hasattr(n, 'type'):
-                if n.type in ('varDecl', 'formal', 'formalparameter') or 'Decl' in n.type:
-                    # n[1] is the identifier node. Map it to the stack offset
-                    var_sym = str(n[1].sym)
-                    self.sym_to_label[var_sym] = f"{offset}($sp)"
+            if hasattr(n, 'sym'):
+                sym_id = str(n.sym)
+                # if this symbol isn't mapped yet, not a global, not a function, it's a local/parameter!
+                if sym_id not in self.sym_to_label:
+                    self.sym_to_label[sym_id] = f"{offset}($sp)"
                     offset += 4
+            if hasattr(n, '__iter__') and not isinstance(n, str):
                 for child in n:
                     traverse(child)
-
         traverse(node)
         return offset # this returns the total stack frame size needed
 
@@ -185,23 +185,24 @@ class CodeGenerator(ASTTraversal):
         # find all parameters, formals, and save incoming registers to their stack slots
         formals = []
         def find_formals(n):
-            if hasattr(n, 'type') and n.type in ('formal', 'formalparameter'):
-                formals.append(str(n[1].sym))
-            elif hasattr(n, '__iter__') and not isinstance(n, str):
+            if hasattr(n, 'type') and n.type == 'block':
+                return # stop searching, we hit the body
+            if hasattr(n, 'sym'):
+                sym_id = str(n.sym)
+                # if it's stored on the stack, it must be a parameter
+                if self.sym_to_label.get(sym_id, "").endswith("($sp)") and sym_id not in formals:
+                    formals.append(sym_id)
+            if hasattr(n, '__iter__') and not isinstance(n, str):
                 for child in n:
                     find_formals(child)
 
-        # search the signature area, usually node[2] or node[3], for parameters
-        for child in node[2:]:
-            if hasattr(child, 'type') and child.type != 'block':
-                find_formals(child)
+        find_formals(node)
 
-        # emit standard MIPS argument saves like sw $a0, 4($sp); sw $a1, 8($sp); etc.
+        # emit standard MIPS argument saves: sw $a0, 4($sp); sw $a1, 8($sp)
         for i, sym in enumerate(formals):
             offset = self.sym_to_label.get(sym)
             if offset:
                 self.emit(f"\tsw $a{i},{offset}")
-
 
     def n_funcDecl_exit(self, node):
         self.emit(f"{node.exit_label}:") # use the saved label
