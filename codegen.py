@@ -124,6 +124,10 @@ class CodeGenerator(ASTTraversal):
         frame_size = self.setup_stack_frame(node)
         node.frame_size = frame_size
 
+        # save the exit label so return statements know where to jump
+        self.current_exit_label = self.get_new_label()
+        node.exit_label = self.current_exit_label # save it for the exit hook
+
         self.emit(f"{main_label}:")
         # allocate stack space and save return address
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
@@ -171,6 +175,10 @@ class CodeGenerator(ASTTraversal):
         # calculate stack frame size and save it on the node
         frame_size = self.setup_stack_frame(node)
         node.frame_size = frame_size
+
+        # save the exit label so return statements know where to jump
+        self.current_exit_label = self.get_new_label()
+        node.exit_label = self.current_exit_label # save it for the exit hook
 
         self.emit(f"{func_label}:")
         self.emit(f"\tsubu $sp,$sp,{frame_size}")
