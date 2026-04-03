@@ -42,31 +42,35 @@ class CodeGenerator(ASTTraversal):
     def setup_stack_frame(self, node):
         offset = 4 # 0($sp) is reserved for the return address ($ra)
         formals = [] # keep track of parameters so we can save $a0, $a1, etc.
-        def find_symbols(n, is_param):
+        def traverse(n):
             nonlocal offset
-            if hasattr(n, 'sym') and n.sym:
-                sym_str = str(n.sym)
-                if sym_str not in self.sym_to_label:
-                    self.sym_to_label[sym_str] = f"{offset}($sp)"
-                    offset += 4
-                    if is_param:
-                        formals.append(sym_str)
+            if hasattr(n, 'type'):
+                # if it's a parameter -> allocate space AND add to formals list
+                if n.type in ('formal', 'formalparameter'):
+                    var_sym = str(n[1].sym)
+                    if var_sym not in self.sym_to_label:
+                        self.sym_to_label[var_sym] = f"{offset}($sp)"
+                        offset += 4
+                        formals.append(var_sym)
+
+                # if it's a local variable -> allocate space ONLY
+                elif n.type == 'varDecl':
+                    var_sym = str(n[1].sym)
+                    if var_sym not in self.sym_to_label:
+                        self.sym_to_label[var_sym] = f"{offset}($sp)"
+                        offset += 4
 
             # recursively check children without breaking on AST objects!
             if not isinstance(n, str):
                 try:
                     for child in n:
-                        find_symbols(child, is_param)
+                        traverse(child)
                 except TypeError:
                     pass
 
-        # specifically scan node[2], the formals list first to map $a0, $a1
-        if len(node) > 2:
-            find_symbols(node[2], True)
-
-        # scan the rest of the function for local variables
-        find_symbols(node, False)
-        return offset, formals
+        # scan the function for local variables
+        traverse(node)
+        return offset, formals # return both the size and the parameter list
 
 
     def get_new_label(self):
@@ -411,8 +415,53 @@ class CodeGenerator(ASTTraversal):
     def n_LE_exit(self, node): self.default_binary_op(node, "sle")
     def n_GE_exit(self, node): self.default_binary_op(node, "sge")
 
-    def n_AND_exit(self, node): self.default_binary_op(node, "and")
-    def n_OR_exit(self, node): self.default_binary_op(node, "or")
+    def n_AND(self, node):
+        node.end_label = self.get_new_label()
+
+        # evaluate the left side
+        self.preorder(node[0])
+        left_reg = node[0].reg
+
+        # if left side is false (0), jump to the end, as the result stays 0
+        self.emit(f"\tbeqz {left_reg},{node.end_label}")
+
+        # otherwise, evaluate the right side
+        self.preorder(node[1])
+        right_reg = node[1].reg
+
+        # the result of the AND is whatever the right side evaluated to
+        self.emit(f"\tmove {left_reg},{right_reg}")
+        self.free_reg(right_reg)
+
+        # emit the end label and pass the register up the tree
+        self.emit(f"{node.end_label}:")
+        node.reg = left_reg
+        node.prune = True # prune so the auto traversal doesn't run the children again
+
+    def n_OR(self, node):
+        node.end_label = self.get_new_label()
+
+        # evaluate the left side
+        self.preorder(node[0])
+        left_reg = node[0].reg
+
+        # if left side is true (1), jump to the end, as the result stay 1
+        self.emit(f"\tbnez {left_reg},{node.end_label}")
+
+        # otherwise, evaluate the right side
+        self.preorder(node[1])
+        right_reg = node[1].reg
+
+        # the result of the OR is whatever the right side evaluated to
+        self.emit(f"\tmove {left_reg},{right_reg}")
+        self.free_reg(right_reg)
+
+        # emit the end label and pass the register up the tree
+        self.emit(f"{node.end_label}:")
+        node.reg = left_reg
+        node.prune = True # prune so the auto traversal doesn't run the children again
+
+
     def n_NOT_exit(self, node):
         # NOT just checks if the child evaluates to 0
         child_reg = node[0].reg
