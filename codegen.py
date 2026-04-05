@@ -32,7 +32,7 @@ class CodeGenerator(ASTTraversal):
 
     def alloc_reg(self, lineno=None):
         if not self.free_registers:
-            sys.stderr.write(f"error: expression too complicated, ran out of registers at or near line {lineno}\n")
+            sys.stderr.write(f"error: expression too complicated")
             sys.exit(1)
 
         reg = self.free_registers.pop() # LIFO pop for tight register reuse
@@ -185,9 +185,11 @@ class CodeGenerator(ASTTraversal):
             "Lgetchar:",
             "\tli $v0, 12            # syscall 12: read char",
             "\tsyscall",
-            "\tbnez $v0, Lgetchar_ok # if SPIM returned a valid char, we're good!",
-            "\tli $v0, -1            # if SPIM returned 0 (EOF), force it to be standard -1",
-            "Lgetchar_ok:",
+            "\tbeq $v0, 0, Lgetchar_eof   # SPIM sometimes returns 0 on EOF",
+            "\tbeq $v0, -1, Lgetchar_eof  # standard EOF",
+            "\tjr $ra",
+            "Lgetchar_eof:",
+            "\tli $v0, -1            # force -1 for J-- EOF",
             "\tjr $ra",
             "",
             "Lhalt:",
@@ -298,6 +300,11 @@ class CodeGenerator(ASTTraversal):
         frame_size, formals = self.setup_stack_frame(node)
         node.frame_size = frame_size
 
+        # MIPS > 4 arguments safety check
+        if len(formals) > 4:
+            sys.stderr.write(f"error: MIPS functions can't have > 4 arguments at or near line {getattr(node, 'lineno', None)}\n")
+            sys.exit(1)
+
         # save the exit label so return statements know where to jump
         self.current_exit_label = self.get_new_label()
         node.exit_label = self.current_exit_label
@@ -342,6 +349,12 @@ class CodeGenerator(ASTTraversal):
         # evaluate and load arguments
         if len(node) > 1:
             actuals = node[1]
+
+            # MIPS > 4 arguments safety check
+            if len(actuals) > 4:
+                sys.stderr.write(f"error: MIPS functions can't have > 4 arguments at or near line {getattr(node, 'lineno', None)}\n")
+                sys.exit(1)
+
             for i in range(len(actuals)):
                 arg_reg = get_reg(actuals[i])
                 if arg_reg:
@@ -351,6 +364,7 @@ class CodeGenerator(ASTTraversal):
         # dynamic caller save for only user defined function
         is_predefined = func_sym in ['sym1', 'sym2', 'sym3', 'sym4', 'sym5', 'sym6']
 
+        all_regs = [f"$s{i}" for i in range(8, -1, -1)] + [f"$t{i}" for i in range(9, -1, -1)]
         # tracker to grab active registers
         in_use = [r for r in self.live_registers]
 
