@@ -595,8 +595,71 @@ class CodeGenerator(ASTTraversal):
     def n_LE_exit(self, node): self.default_binary_op(node, "sle")
     def n_GE_exit(self, node): self.default_binary_op(node, "sge")
 
-    def n_AND_exit(self, node): self.default_binary_op(node, "and")
-    def n_OR_exit(self, node): self.default_binary_op(node, "or")
+
+    def n_AND(self, node):
+        node.end_label = self.get_new_label()
+
+        # evaluate the left side
+        self.preorder(node[0])
+        left_reg = node[0].reg
+
+        # allocate a dedicated result register to match the reference compiler
+        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tmove {res_reg},{left_reg}")
+        self.free_reg(left_reg)
+
+        # if left side is false (0), jump to the end, as the result stays 0
+        self.emit(f"\tbeqz {res_reg},{node.end_label}")
+
+        # otherwise, evaluate the right side
+        self.preorder(node[1])
+        right_reg = node[1].reg
+
+        # the result of the AND is whatever the right side evaluated to
+        self.emit(f"\tmove {res_reg},{right_reg}")
+        self.free_reg(right_reg)
+
+        # emit the end label and pass the result register up the tree
+        self.emit(f"{node.end_label}:")
+        node.reg = res_reg
+
+        # prune the children so the automatic traversal doesn't evaluate them a second time
+        node[0].prune = True
+        node[1].prune = True
+
+
+    def n_OR(self, node):
+        node.end_label = self.get_new_label()
+
+        # evaluate the left side
+        self.preorder(node[0])
+        left_reg = node[0].reg
+
+        # allocate a dedicated result register
+        res_reg = self.alloc_reg(getattr(node, 'lineno', None))
+        self.emit(f"\tmove {res_reg},{left_reg}")
+        self.free_reg(left_reg)
+
+        # if left side is true (1), jump to the end, as the result stays 1
+        self.emit(f"\tbnez {res_reg},{node.end_label}")
+
+        # otherwise, evaluate the right side
+        self.preorder(node[1])
+        right_reg = node[1].reg
+
+        # the result of the OR is whatever the right side evaluated to
+        self.emit(f"\tmove {res_reg},{right_reg}")
+        self.free_reg(right_reg)
+
+        # emit the end label and pass the result register up the tree
+        self.emit(f"{node.end_label}:")
+        node.reg = res_reg
+
+        # prune the children so the automatic traversal doesn't evaluate them a second time
+        node[0].prune = True
+        node[1].prune = True
+
+
     def n_NOT_exit(self, node):
         # NOT just checks if the child evaluates to 0
         child_reg = node[0].reg
