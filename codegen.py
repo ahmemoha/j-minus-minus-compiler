@@ -207,9 +207,12 @@ class CodeGenerator(ASTTraversal):
             "\tL_div_zero_msg: .asciiz \"error: division by zero\\n\"",
             "\t.text",
             "\tla $a0, L_div_zero_msg",
-            "\tli $v0, 4             # syscall 4: print string",
+            "\tj error               # jump to generic error handler",
+            "",
+            "error:",
+            "\tli $v0, 4             # syscall 4: print string address in $a0",
             "\tsyscall",
-            "\tli $a0, 1             # set the return code to 1!",
+            "\tli $a0, 1             # set the return code to 1",
             "\tli $v0, 17            # syscall 17: exit2, exit with code",
             "\tsyscall"
             "",
@@ -341,8 +344,19 @@ class CodeGenerator(ASTTraversal):
         # node[0] is the return type node
         ret_type = getattr(node[0], 'attr', str(node[0]))
         if ret_type != 'void':
-            # if execution gets here, the program crashes
-            self.emit("\tj L_missing_return_error")
+            func_name = getattr(node[1], 'attr', str(node[1]))
+            str_label = self.get_new_string_label()
+
+            # generate the specific error string in the data section
+            self.emit("\t.data")
+            self.emit(f"{str_label}:")
+            self.emit(f"\t.asciiz \"error: function '{func_name}' must return a value\\n\"")
+            self.emit("\t.align 2")
+            self.emit("\t.text")
+
+            # load the string address into $a0 and jump to the generic error handler
+            self.emit(f"\tla $a0,{str_label}")
+            self.emit("\tj error")
 
         self.emit(f"{node.exit_label}:") # use the saved label
         self.emit("\tlw $ra,0($sp)")
