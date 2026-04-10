@@ -206,6 +206,17 @@ class CodeGenerator(ASTTraversal):
             "\tli $a0, 1             # set the return code to 1!",
             "\tli $v0, 17            # syscall 17: exit2 (exit with code)",
             "\tsyscall"
+            "",
+            "L_missing_return_error:",
+            "\t.data",
+            "\tL_miss_ret_msg: .asciiz \"error: function must return a value\\n\"",
+            "\t.text",
+            "\tla $a0, L_miss_ret_msg",
+            "\tli $v0, 4",
+            "\tsyscall",
+            "\tli $a0, 1",
+            "\tli $v0, 17",
+            "\tsyscall"
         ]
 
         # combine them
@@ -320,6 +331,13 @@ class CodeGenerator(ASTTraversal):
                 self.emit(f"\tsw $a{i},{offset}")
 
     def n_funcDecl_exit(self, node):
+        # if this is a non void function, it is an error to reach the end
+        # node[0] is the return type node
+        ret_type = getattr(node[0], 'attr', str(node[0]))
+        if ret_type != 'void':
+            # Insert a trap! If execution gets here, the program crashes.
+            self.emit("\tj L_missing_return_error")
+
         self.emit(f"{node.exit_label}:") # use the saved label
         self.emit("\tlw $ra,0($sp)")
         self.emit(f"\taddu $sp,$sp,{node.frame_size}")
