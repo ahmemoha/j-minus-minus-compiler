@@ -183,10 +183,16 @@ class CodeGenerator(ASTTraversal):
             "\tjr $ra",
             "",
             "Lgetchar:",
-            "\tli $v0, 12            # syscall 12: read char",
+            "\t.data",
+            "\tLgetchar_buf: .space 1",
+            "\t.text",
+            "\tli $v0, 14            # syscall 14: read from file",
+            "\tli $a0, 0             # file descriptor 0 = stdin",
+            "\tla $a1, Lgetchar_buf  # buffer address",
+            "\tli $a2, 1             # read exactly 1 byte",
             "\tsyscall",
-            "\tbeq $v0, 0, Lgetchar_eof   # SPIM sometimes returns 0 on EOF",
-            "\tbeq $v0, -1, Lgetchar_eof  # standard EOF",
+            "\tblez $v0, Lgetchar_eof # if bytes read <= 0, it's EOF",
+            "\tlbu $v0, Lgetchar_buf  # load the byte unsigned into $v0",
             "\tjr $ra",
             "Lgetchar_eof:",
             "\tli $v0, -1            # force -1 for J-- EOF",
@@ -204,7 +210,7 @@ class CodeGenerator(ASTTraversal):
             "\tli $v0, 4             # syscall 4: print string",
             "\tsyscall",
             "\tli $a0, 1             # set the return code to 1!",
-            "\tli $v0, 17            # syscall 17: exit2 (exit with code)",
+            "\tli $v0, 17            # syscall 17: exit2, exit with code",
             "\tsyscall"
             "",
             "L_missing_return_error:",
@@ -258,7 +264,7 @@ class CodeGenerator(ASTTraversal):
 
     def n_string(self, node):
         raw_str = node.attr
-        inner_str = raw_str[1:-1] # Strip the outer double quotes
+        inner_str = raw_str[1:-1] # strip the outer double quotes
         # manually parse escapes to completely avoid Python's eval() crashing on null bytes
         evaluated_str = []
         i = 0
@@ -335,7 +341,7 @@ class CodeGenerator(ASTTraversal):
         # node[0] is the return type node
         ret_type = getattr(node[0], 'attr', str(node[0]))
         if ret_type != 'void':
-            # Insert a trap! If execution gets here, the program crashes.
+            # if execution gets here, the program crashes
             self.emit("\tj L_missing_return_error")
 
         self.emit(f"{node.exit_label}:") # use the saved label
@@ -442,7 +448,7 @@ class CodeGenerator(ASTTraversal):
         node[0].is_lvalue = True
 
     def n_id_exit(self, node):
-        # if this is the left side of an assignment OR a declaration, do nothing!
+        # if this is the left side of an assignment OR a declaration, do nothing
         if getattr(node, 'is_lvalue', False) or getattr(node, 'is_decl', False):
             return
 
@@ -484,7 +490,8 @@ class CodeGenerator(ASTTraversal):
         self.preorder(node[0])
         cond_reg = node[0].reg
 
-        # emit the branch instruction! If false (0), jump to end_label
+        # emit the branch instruction
+        # if false (0), jump to end_label
         self.emit(f"\tbeqz {cond_reg},{node.end_label}")
         self.free_reg(cond_reg)
 
