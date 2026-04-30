@@ -15,3 +15,8 @@ Run `make` to generate the necessary ANTLR4 lexer and parser files.
 
 ## Usage
 `python3 main.py <input_file.j--> > output.s`, then run the compiled MIPS assembly in SPIM
+
+#⚠️ Academic Integrity Warning
+This repository contains my personal coursework for CPSC 411 at the University of Calgary. It is provided here strictly for portfolio and professional showcase purposes.
+
+Current or future students are strictly prohibited from using, copying, or referencing this code for their own assignments. Plagiarism tracking tools are heavily utilized by the computer science department. Copying this code will result in an immediate academic misconduct investigation and a potential failure of the course. I will not be held liable for any academic penalties you incur.
